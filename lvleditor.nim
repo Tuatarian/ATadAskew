@@ -1,4 +1,4 @@
-import raylib, rayutils, lenientops, sequtils, strutils
+import raylib, rayutils, lenientops, sequtils, math
 
 template C1*() : Color = makecolor("B51C20", 255)
 template C2*() : Color = makecolor("A9400D", 255)
@@ -42,12 +42,13 @@ var
 #[ MODES
  0 : Adding Mode
  1 : Editing Mode
- 2 : Deleting Mode
+ 2 : Delete Mode
 ]#
 
 func world2screen(v, o : Vector2, z : float) : Vector2 = (v - o)*z
-
+proc world2screen(v : Vector2) : Vector2 = (v - offset)*zoom
 func screen2world(v, o : Vector2, z : float) : Vector2 = v/z + o
+proc screen2world(v : Vector2) : Vector2 = v/zoom + offset
 
 InitWindow screenWidth, screenHeight, "GAME_NAME"
 SetTargetFPS 60
@@ -67,23 +68,40 @@ while not WindowShouldClose():
     if IsKeyPressed KEY_M: mode = (mode + 1) mod 2
     if IsKeyPressed KEY_P: 
         polys.add @[]
+        drawnPolys.add @[]
         cObj = polys.len - 1
 
     if mode == 0:
-        if IsKeyPressed KEY_C:
-            if polys[cObj][^1] != polys[cObj][0]:
-                polys[cObj].add polys[cObj][0]
+        # if IsKeyPressed KEY_C:
+        #     if polys[cObj][^1] != polys[cObj][0]:
+        #         polys[cObj].add polys[cObj][0]
         DrawCircleV(mpos, 4, GREEN)
         if IsMouseButtonPressed MOUSE_LEFT_BUTTON:
             polys[cObj].add screen2world(mpos, offset, zoom)
+        if drawnPolys.len > 0 and drawnPolys[cObj].len > 1: #IsKeyPressed(KEY_C):
+            var lines : seq[float]
+
+            for i in 0..<drawnPolys[cObj].len:
+                lines.add abs(drawnPolys[cObj][i].y + ((drawnPolys[cObj][(i + 1) mod drawnPolys[cObj].len].y - drawnPolys[cObj][i].y)/(drawnPolys[cObj][(i + 1) mod drawnPolys[cObj].len].x - drawnPolys[cObj][i].x))*(mpos.x - drawnPolys[cObj][i].x) - mpos.y)
+            let th = 20
+            drawTextCenteredY($(lines.mapIt(it.roundToInt)), 100, 100, 40, WHITEE)
+            if min(lines) <= th:
+                DrawCircleV(mpos, 6, WHITE)
+                DrawCircleV(drawnPolys[cObj][(lines.find(min(lines)) + 1) mod lines.len], 6, WHITE)
+                DrawCircleV(drawnPolys[cObj][lines.find(min(lines))], 6, WHITE)
+                if IsKeyPressed KEY_C:
+                    polys[cObj].insert(screen2world mpos, (lines.find(min(lines)) + 1) mod drawnPolys[cObj].len)
+            # y = p0y + (dy/dx)
+            # if endpts[0].y + (endpts[0].y - endpts[1].y)/(endpts[0].x - endpts[1].x)*(mpos.x - endpts[0].x) - mpos.y <= th:
+            #     polys[cObj].insert(screen2world mpos, drawnPolys[cObj].find(endpts[0]) + 1)
     if mode == 1:
-        if (not(IsMouseButtonDown(MOUSE_LEFT_BUTTON) and mpos - drawnPolys[cObj][adjInx] <& makevec2(4, 4))):
+        if (not(IsMouseButtonDown(MOUSE_LEFT_BUTTON))):
             for i in 0..<polys[cObj].len:
-                if mpos - drawnPolys[cObj][i] <& makevec2(4, 4):
+                if abs(mpos - drawnPolys[cObj][i]) <& makevec2(20, 20):
                     adjInx = i
         if adjInx != -1:
-            DrawCircleV(drawnPolys[cObj][adjInx], 10, BLUE)
-            if IsMouseButtonDown MOUSE_LEFT_BUTTON:
+            DrawCircleV(drawnPolys[cObj][adjInx], 6, BLUE)
+            if IsMouseButtonDown(MOUSE_LEFT_BUTTON) and abs(mpos - drawnPolys[cObj][adjInx]) <& max(makevec2(20, 20), abs(mposLast - mpos) + makevec2(4, 4)):
                 polys[cObj][adjInx] = screen2World(mpos, offset, zoom)
 
     drawnPolys = polys.mapIt(it.mapIt(it.world2screen(offset, zoom)))
@@ -91,7 +109,7 @@ while not WindowShouldClose():
         if i == cObj and polys[cObj].len > 1:
             drawLines(drawnPolys[cObj], C1)
             for i in drawnPolys[cObj]:
-                DrawCircleV(i, 2, C1)
+                DrawCircleV(i, 4, C1)
         elif polys[i].len > 1: 
             drawLines(drawnPolys[i], WHITEE)
 
