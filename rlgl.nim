@@ -106,7 +106,10 @@ template RLGL_VERSION*(): auto = "4.0"
 # Function specifiers in case library is build/used as a shared library (Windows)
 # NOTE: Microsoft specifiers to tell compiler that symbols are imported/exported from a .dll
 # Function specifiers definition
-{.pragma: RLAPI, cdecl, discardable, dynlib: "libraylib" & LEXT.}
+const LEXT* = when defined(windows):".dll"
+elif defined(macosx):               ".dylib"
+else:                               ".so"
+{.pragma: RLAPI, cdecl, discardable, dynlib: "raylib" & LEXT.}
 # Support TRACELOG macros
 # Allow custom memory allocators
 # Security check in case no GRAPHICS_API_OPENGL_* defined
@@ -491,14 +494,14 @@ proc rlSetShader*(id: uint32; locs: pointer) {.RLAPI, importc: "rlSetShader".} #
 proc rlLoadComputeShaderProgram*(shaderId: uint32): uint32 {.RLAPI, importc: "rlLoadComputeShaderProgram".} # Load compute shader program
 proc rlComputeShaderDispatch*(groupX: uint32; groupY: uint32; groupZ: uint32) {.RLAPI, importc: "rlComputeShaderDispatch".} # Dispatch compute shader (equivalent to *draw* for graphics pilepine)
 # Shader buffer storage object management (ssbo)
-proc rlLoadShaderBuffer*(size: unsigned long long; data: pointer; usageHint: int32): uint32 {.RLAPI, importc: "rlLoadShaderBuffer".} # Load shader storage buffer object (SSBO)
+proc rlLoadShaderBuffer*(size: culonglong; data: pointer; usageHint: int32): uint32 {.RLAPI, importc: "rlLoadShaderBuffer".} # Load shader storage buffer object (SSBO)
 proc rlUnloadShaderBuffer*(ssboId: uint32) {.RLAPI, importc: "rlUnloadShaderBuffer".} # Unload shader storage buffer object (SSBO)
-proc rlUpdateShaderBufferElements*(id: uint32; data: pointer; dataSize: unsigned long long; offset: unsigned long long) {.RLAPI, importc: "rlUpdateShaderBufferElements".} # Update SSBO buffer data
-proc rlGetShaderBufferSize*(id: uint32): unsigned long long {.RLAPI, importc: "rlGetShaderBufferSize".} # Get SSBO buffer size
-proc rlReadShaderBufferElements*(id: uint32; dest: pointer; count: unsigned long long; offset: unsigned long long) {.RLAPI, importc: "rlReadShaderBufferElements".} # Bind SSBO buffer
+proc rlUpdateShaderBufferElements*(id: uint32; data: pointer; dataSize: culonglong; offset: culonglong) {.RLAPI, importc: "rlUpdateShaderBufferElements".} # Update SSBO buffer data
+proc rlGetShaderBufferSize*(id: uint32): culonglong {.RLAPI, importc: "rlGetShaderBufferSize".} # Get SSBO buffer size
+proc rlReadShaderBufferElements*(id: uint32; dest: pointer; count: culonglong; offset: culonglong) {.RLAPI, importc: "rlReadShaderBufferElements".} # Bind SSBO buffer
 proc rlBindShaderBuffer*(id: uint32; index: uint32) {.RLAPI, importc: "rlBindShaderBuffer".} # Copy SSBO buffer data
 # Buffer management
-proc rlCopyBuffersElements*(destId: uint32; srcId: uint32; destOffset: unsigned long long; srcOffset: unsigned long long; count: unsigned long long) {.RLAPI, importc: "rlCopyBuffersElements".} # Copy SSBO buffer data
+proc rlCopyBuffersElements*(destId: uint32; srcId: uint32; destOffset: culonglong; srcOffset: culonglong; count: culonglong) {.RLAPI, importc: "rlCopyBuffersElements".} # Copy SSBO buffer data
 proc rlBindImageTexture*(id: uint32; index: uint32; format: uint32; readonly: int32) {.RLAPI, importc: "rlBindImageTexture".} # Bind image texture
 # Matrix state management
 proc rlGetMatrixModelview*(): Matrix {.RLAPI, importc: "rlGetMatrixModelview".} # Get internal modelview matrix
