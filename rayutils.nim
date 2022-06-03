@@ -1,4 +1,4 @@
-import raylib, math, hashes, sugar, macros, strutils, lenientops, algorithm, random, os, sequtils
+import raylib, math, hashes, sugar, macros, strutils, lenientops, algorithm, random, os, sequtils, rlgl
 
 randomize()
 
@@ -31,8 +31,10 @@ func colHex*(c : Color) : string =
 func makevec2*(x, y: float | float32 | int) : Vector2 =  ## Easy vec2 constructor
     Vector2(x : float x, y : float y)
 
+func maketri*(v1, v2, v3  : Vector2) : Triangle = Triangle(v1 : v1, v2 : v2, v3 : v3)
+
 func sigmoid*(x : int | float, a : int | float = 1, b : int | float = E, h : int | float = 1, k : int | float = 0, z : int | float = 0) : float = ## Sigmoid in the form a(1/1 + e^(hx + z)) + k
-    return a * 1/(1 + pow(E, h * x + z)) + k
+    return a * 1/(1 + pow(b, h * x + z)) + k
 
 template iterIt*(s, op : untyped) : untyped =
     for i in low(s)..high(s):
@@ -53,9 +55,9 @@ func `+`*[T](v : Vector2, n : T) : Vector2 =
     result.x = v.x + n
     result.y = v.y + n
 
-func `-`*[T](v : Vector2, n : T) : Vector2 =
-    result.x = v.x - n.float
-    result.y = v.y - n.float
+func `+`*[T](n : T, v : Vector2) : Vector2 =
+    result.x = v.x + n
+    result.y = v.y + n
 
 func `+=`*[T](v : var Vector2, t : T) = 
     v = v + t
@@ -103,22 +105,28 @@ func `*`*(v, v2 : Vector2) : Vector2 =
 func `*`*(v : Vector2, i : int | float | float32) : Vector2 =
     return makevec2(v.x * float32 i, v.y * float32 i)
 
+func `*`*(i : int | float | float32, v : Vector2) : Vector2 =
+    return makevec2(v.x * float32 i, v.y * float32 i)
+
 func `dot`*(v, v2 : Vector2) : float = ## Dot product of 2 vecs
     return (v.x * v2.x) + (v.y * v2.y)
 
-func `*`*(v : Vector2, mat : seq[seq[int]] | seq[seq[float]]) : Vector2 = ## Requires 2x2 matrix atm
+func `*`*(v : Vector2, mat : seq[int] | seq[float]) : Vector2 = ## Requires 2x2 matrix atm
     doAssert mat.len == 2 and mat[0].len == 2, "Only supports 2x2 matrix"
     let
         x = v.x
         y = v.y
-        a = mat[0, 0]
-        b = mat[0, 1]
-        c = mat[1, 0]
-        d = mat[1, 1]
+        a = mat[0]
+        b = mat[1]
+        c = mat[2]
+        d = mat[3]
     return makevec2((x * a) + (y * c), (x * b) + (y * d))
 
-func getRotMat*(th : int | float | float32) : seq[seq[int]] | seq[seq[float]] = # Get Rotation Matrix, Radians
-    return @[@[cos th, -sin th], @[sin th, cos th]]
+func getRotMat*(th : int | float | float32) : seq[int] | seq[float] = ## Get Rotation Matrix, Radians
+    return @[cos th, -sin th, sin th, cos th]
+
+func det*(mat : seq[int] | float | float32) : int | float | float32 = ## 2x2 matrix required
+    mat[0]*mat[3] - mat[2]*mat[1] 
 
 func rotateVec*(v : Vector2, th : int | float | float32) : Vector2 =
     return makevec2(v.x * cos th + v.y * sin th, v.x * sin th + v.y * cos th)
@@ -165,6 +173,10 @@ func drawTextCenteredY*(s : string, x, y, fsize : int, colour : Color) =
     let tSizeVec = MeasureTextEx(GetFontDefault(), s, float fsize, max(20 ,fsize) / 20) div 2 # max(20, fsize) is black box to me
     DrawText s, x, y - tSizeVec.y.int, fsize, colour
 
+func DrawTriangle*(t : Triangle, c : Color) = DrawTriangle(t.v1, t.v2, t.v3, c)
+
+func DrawTriangleLines*(t : Triangle, c : Color) = DrawTriangleLines(t.v1, t.v2, t.v3, c)
+
 proc int2bin*(i : int) : int =
     var i = i
     var rem = 1
@@ -175,8 +187,8 @@ proc int2bin*(i : int) : int =
         result = result + rem * tmp
         tmp = tmp * 10
 
-func makerect*(v, v2, v3, v4 : Vector2) : Rectangle = ## Doesn't check that your points can form a rectangle
-    Rectangle(x : v.x, y : v.y, width : v2.x - v.x, height : v3.y - v2.y)
+func makerect(v, v2 : Vector2) : Rectangle = 
+    Rectangle(x : v.x, y : v2.y, width : v.x - v2.x, height : v2.y - v.y)
 
 func makerect*(x: int | float | float32, y : int | float | float32, w : int | float | float32, h : int | float | float32) : Rectangle =
     Rectangle(x : float x, y : float y, width : float w, height : float h)
@@ -202,8 +214,12 @@ func `in`*(v : Vector2, tri : Triangle) : bool =
     let d3 = sign(v, tri.v3, tri.v1)
     return not (((d < 0) or (d2 < 0) or (d3 < 0)) and ((d > 0) or (d2 > 0) or (d3 > 0)))
 
-func `in`*(v : Vector2, v1, v2, v3, v4 : Vector2) : bool =
-    return v in makerect(v1, v2, v3, v4)
+func `notin`*(v : Vector2, t : Triangle) : bool = not(v in t)
+
+func `notin`*(v : Vector2, v1, v2, v3 : Vector2) : bool = not(v in maketri(v1, v2, v3))
+
+func `in`*(v : Vector2, v1, v2: Vector2) : bool =
+    return v in makerect(v1, v2)
 
 proc UnloadTexture*(texargs : varargs[Texture]) = ## runs UnloadTexture for each vararg
     texargs.iterIt(UnloadTexture it)
@@ -236,6 +252,8 @@ func maxVargs*[T](args : varargs[T]) : T =
         if i > lastmax:
             lastmax = i
     return lastmax
+
+func mean*[T](items : varargs[T]) : T = sum(items) / items.len
 
 func ceil*(v : Vector2) : Vector2 = ## Returns ceil x, ceil y
     return makevec2(ceil v.x, ceil v.y)
@@ -353,7 +371,7 @@ proc hash*(v : Vector2) : Hash = ## Hash for vec2
 #                     swap(points[k], points[k + 1])
 #         DrawTriangle(points[0], points[1], points[2], color)
 
-proc drawTriangleFan*(verts : varargs[Vector2], color : Color) = ## Probably inefficient convex polygon renderer
+proc drawTriangleFan*(verts : varargs[Vector2], color : Color) = ## CONVEX polygon renderer
     var inpoint : Vector2
     var mutverts : seq[Vector2]
 
@@ -374,6 +392,58 @@ proc drawTriangleFan*(verts : varargs[Vector2], color : Color) = ## Probably ine
                     swap(polarpoints[k], polarpoints[k + 1])
                     swap(points[k], points[k + 1])
         DrawTriangle(points[0], points[1], points[2], color)
+
+proc drawPolygon*(verts : seq[Vector2], color : Color) = ## general polygon renderer, ear clipping
+    var mutverts = verts
+    var tris : seq[Triangle]
+    var marked = -1
+    let outpoint = makevec2(min(mutverts.map(x => x.x)) - 20, min(mutverts.map(x => x.x)) - 20)
+    
+    while mutverts.len > 3:
+        if marked != -1:
+            mutverts.delete marked
+            marked = -1
+        for i in 1..mutverts.len:
+            let (v0, v1, v2) = (mutverts[i - 1], mutverts[i mod mutverts.len], mutverts[(i + 1) mod mutverts.len])
+            
+            # check if triangle formed by v0, v1, v2 contains any other vertices of polygons
+            var noVertIn = true
+            for j in 0..<mutverts.len:
+                if j != i - 1 and j != i mod mutverts.len and j != (i + 1) mod mutverts.len:
+                    if mutverts[j] in maketri(v0, v1, v2):
+                        noVertIn = false
+            if not noVertIn: continue
+
+            # Check if triangle is inside polygon
+            let inpoint = mean(v0, v1, v2)
+            var hits : int
+            for j in 0..<mutverts.len:
+                let (p1, p2) = (mutverts[j], mutverts[(j + 1) mod mutverts.len])
+                let m1 = (p2.y - p1.y)/(p2.x - p1.x)
+                let b1 = p1.y - m1*p1.x
+                let m = (outpoint.y - inpoint.y)/(outpoint.x - inpoint.x)
+                let b = inpoint.y - m*inpoint.x
+
+                let intsec = (b1 - b)/(m - m1)
+                echo intsec in p1.x..p2.x, intsec in inpoint.x..outpoint.x
+                if intsec in p1.x..p2.x and intsec in inpoint.x..outpoint.x:
+                    rlSetLineWidth 3
+                    DrawLineV p1, p2, BGREY
+                    DrawLineV(inpoint, outpoint, BLUE)
+                    rlSetLineWidth 1
+                    DrawCircleV(makevec2(intsec, intsec * m1 + b1), 8, WHITE)
+                    hits += 1
+            if hits mod 2 == 1:
+                tris.add maketri(v0, v1, v2)
+                mutverts.delete i
+                break
+            if hits == 2:
+                echo "hits == 0"
+        for i in tris:
+            DrawTriangleLines i, color
+        DrawTriangleLines mutverts[0], mutverts[1], mutverts[2], color
+
+
 
 func normalize*(v : Vector2) : Vector2 = ## Normalize Vector
     return v / sqrt(v.x ^ 2 + v.y ^ 2)
@@ -433,9 +503,6 @@ func isPositive*[T](t : T) : bool =
 func rectPoints*(rect : Rectangle) : array[4, Vector2] =
     return [makevec2(rect.x, rect.y), makevec2(rect.x + rect.width, rect.y), makevec2(rect.x + rect.width, rect.y + rect.height), makevec2(rect.x, rect.y + rect.height)]
 
-func maketri*(v1, v2, v3 : Vector2) : Triangle = 
-    return Triangle(v1 : v1, v2 : v2, v3 : v3)
-
 iterator items*(tri : Triangle) : Vector2 =
     yield tri.v1
     yield tri.v2
@@ -461,8 +528,6 @@ iterator findAll*[T](s : openArray[T], pred : (T) -> bool) : int =
     for i, x in s:
         if pred x:
             yield i
-proc DrawTriangle*(t : Triangle, col : Color) =
-    DrawTriangle(t.v1, t.v2, t.v3, col)    
 
 # func delaunayBW*(pts : seq[Vector2], super : Triangle) : seq[Triangle] = ##Bowyer-Watson implementation, super = super triangle containing all points in pts, O(n^2)
 #     result.add super
