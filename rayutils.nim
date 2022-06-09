@@ -393,11 +393,14 @@ proc drawTriangleFan*(verts : varargs[Vector2], color : Color) = ## CONVEX polyg
                     swap(points[k], points[k + 1])
         DrawTriangle(points[0], points[1], points[2], color)
 
-proc drawPolygon*(verts : seq[Vector2], color : Color) = ## general polygon renderer, ear clipping
+func isCCW*(s : seq[Vector2]) : bool =
+    doAssert s.len >= 3
+    return s[0].x*s[1].y - s[0].y*s[1].x + s[1].x*s[2].y - s[1].y*s[2].x + s[0].x*s[2].y - s[0].y*s[2].x < 0
+
+proc drawPolygon*(verts : seq[Vector2], color : Color, ccw : bool) = ## general polygon renderer, naive ear clipping. CCW = counter clockwise - renderer needs to know if points are ccw or clockwise
     var mutverts = verts
     var tris : seq[Triangle]
     var marked = -1
-    let outpoint = makevec2(min(mutverts.map(x => x.x)) - 20, min(mutverts.map(x => x.x)) - 20)
     
     while mutverts.len > 3:
         if marked != -1:
@@ -405,6 +408,9 @@ proc drawPolygon*(verts : seq[Vector2], color : Color) = ## general polygon rend
             marked = -1
         for i in 1..mutverts.len:
             let (v0, v1, v2) = (mutverts[i - 1], mutverts[i mod mutverts.len], mutverts[(i + 1) mod mutverts.len])
+            if (v2.y - v1.y)/(v2.x - v1.y) == (v0.y - v1.y)/(v0.x - v1.x):
+                marked = i
+                break
             
             # check if triangle formed by v0, v1, v2 contains any other vertices of polygons
             var noVertIn = true
@@ -414,35 +420,24 @@ proc drawPolygon*(verts : seq[Vector2], color : Color) = ## general polygon rend
                         noVertIn = false
             if not noVertIn: continue
 
-            # Check if triangle is inside polygon
-            let inpoint = mean(v0, v1, v2)
-            var hits : int
-            for j in 0..<mutverts.len:
-                let (p1, p2) = (mutverts[j], mutverts[(j + 1) mod mutverts.len])
-                let m1 = (p2.y - p1.y)/(p2.x - p1.x)
-                let b1 = p1.y - m1*p1.x
-                let m = (outpoint.y - inpoint.y)/(outpoint.x - inpoint.x)
-                let b = inpoint.y - m*inpoint.x
+            # check if vertex is reflex
 
-                let intsec = (b1 - b)/(m - m1)
-                echo intsec in p1.x..p2.x, intsec in inpoint.x..outpoint.x
-                if intsec in p1.x..p2.x and intsec in inpoint.x..outpoint.x:
-                    rlSetLineWidth 3
-                    DrawLineV p1, p2, BGREY
-                    DrawLineV(inpoint, outpoint, BLUE)
-                    rlSetLineWidth 1
-                    DrawCircleV(makevec2(intsec, intsec * m1 + b1), 8, WHITE)
-                    hits += 1
-            if hits mod 2 == 1:
-                tris.add maketri(v0, v1, v2)
-                mutverts.delete i
-                break
-            if hits == 2:
-                echo "hits == 0"
-        for i in tris:
-            DrawTriangleLines i, color
-        DrawTriangleLines mutverts[0], mutverts[1], mutverts[2], color
-
+            let (r0, r2) = (v0 - v1, v2 - v1)
+            if ccw:
+                if r0.x*r2.y > r0.y*r2.x:
+                    marked = i
+                    tris.add maketri(v0, v1, v2)
+                    break
+            else:
+                if r0.x*r2.y < r0.y*r2.x:
+                    marked = i
+                    tris.add maketri(v2, v1, v0)
+                    break
+    for i in tris:
+        DrawTriangle i, color
+    if mutverts.len >= 3: # Gotta be in ccw order
+        if ccw: DrawTriangle mutverts[0], mutverts[1], mutverts[2], color
+        else: DrawTriangle mutverts[2], mutverts[1], mutverts[0], color
 
 
 func normalize*(v : Vector2) : Vector2 = ## Normalize Vector
