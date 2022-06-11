@@ -28,6 +28,8 @@ func makecolor*(s : string, alp : uint8 = 255) : Color =
 func colHex*(c : Color) : string =
     c.r.toHex & c.g.toHex & c.b.toHex
 
+const colorArr* : array[27, Color] = [LIGHTGRAY, GRAY, DARKGRAY, YELLOW, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE, BLUE, DARKBLUE, PURPLE, VIOLET, DARKPURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BGREY, MAGENTA, RAYWHITE, BGREY, OFFWHITE] ## Array of all rl colours
+
 func makevec2*(x, y: float | float32 | int) : Vector2 =  ## Easy vec2 constructor
     Vector2(x : float x, y : float y)
 
@@ -40,8 +42,6 @@ template iterIt*(s, op : untyped) : untyped =
     for i in low(s)..high(s):
         let it {.inject.} = s[i]
         op
-
-const colorArr* : array[27, Color] = [LIGHTGRAY, GRAY, DARKGRAY, YELLOW, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE, BLUE, DARKBLUE, PURPLE, VIOLET, DARKPURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BGREY, MAGENTA, RAYWHITE, BGREY, OFFWHITE] ## Array of all rl colours
 
 func `+`*(v, v2 : Vector2) : Vector2 =
     result.x = v.x + v2.x
@@ -112,7 +112,6 @@ func `dot`*(v, v2 : Vector2) : float = ## Dot product of 2 vecs
     return (v.x * v2.x) + (v.y * v2.y)
 
 func `*`*(v : Vector2, mat : seq[int] | seq[float]) : Vector2 = ## Requires 2x2 matrix atm
-    doAssert mat.len == 2 and mat[0].len == 2, "Only supports 2x2 matrix"
     let
         x = v.x
         y = v.y
@@ -122,18 +121,18 @@ func `*`*(v : Vector2, mat : seq[int] | seq[float]) : Vector2 = ## Requires 2x2 
         d = mat[3]
     return makevec2((x * a) + (y * c), (x * b) + (y * d))
 
-func getRotMat*(th : int | float | float32) : seq[int] | seq[float] = ## Get Rotation Matrix, Radians
+func getRotMat*(th : int | float | float32) : seq[int] | seq[float] = ## Get Rotation Matrix, Radians, [[a, b],[c,d]] -> [a, b, c, d]
     return @[cos th, -sin th, sin th, cos th]
 
 func det*(mat : seq[int] | float | float32) : int | float | float32 = ## 2x2 matrix required
     mat[0]*mat[3] - mat[2]*mat[1] 
 
-func rotateVec*(v : Vector2, th : int | float | float32) : Vector2 =
-    return makevec2(v.x * cos th + v.y * sin th, v.x * sin th + v.y * cos th)
+func rotateVec*(v : Vector2, th : int | float | float32) : Vector2 = ## About the origin
+    return makevec2(v.x * cos(th) + v.y * sin(th), -v.x * sin(th) + v.y * cos(th))
 
-func rotateVecAbout*(v : Vector2, th : int | float | float32, p : Vector2) : Vector2 = (v - p).rotateVec(th) + p
+func rotateVecAbout*(v : Vector2, th : int | float | float32, c : Vector2) : Vector2 = (v - c).rotateVec(th) + c
 
-proc rotateVecSeq*(s : seq[Vector2], th : int | float | float32, c : Vector2) : seq[Vector2] = s.mapIt rotateVecAbout(it, omega, c)
+proc rotateVecSeq*(s : seq[Vector2], th : int | float | float32, c : Vector2) : seq[Vector2] = s.mapIt rotateVecAbout(it, th, c)
 
 func `<|`*(v : Vector2, n : float32 | int | float) : bool = ## True if either x or y < x2 or y2
     return v.x < n or v.y < n
@@ -349,28 +348,6 @@ proc hash*(v : Vector2) : Hash = ## Hash for vec2
     h = h !& hash v.y
     result = !$h
 
-# proc drawTriangleFan*(verts : openArray[Vector2], color : Color) = ## Probably inefficient convex polygon renderer
-#     var inpoint : Vector2
-#     var mutverts : seq[Vector2]
-# 
-#     for v in verts: 
-#         inpoint = inpoint + v
-#         mutverts.add(v)
-#     
-#     inpoint = inpoint / float verts.len
-#     mutverts.add(verts[0])
-# 
-#     for i in 1..<mutverts.len:
-#         var points = [inpoint, mutverts[i - 1], mutverts[i]]
-#         var ininpoint = (points[0] + points[1] + points[2]) / 3
-#         var polarpoints = [cart2Polar(points[0], ininpoint), cart2Polar(points[1], ininpoint), cart2Polar(points[2], ininpoint)]
-#         for j in 0..points.len:
-#             for k in 0..<points.len - 1 - j:
-#                 if polarpoints[k].y > polarpoints[k + 1].y:
-#                     swap(polarpoints[k], polarpoints[k + 1])
-#                     swap(points[k], points[k + 1])
-#         DrawTriangle(points[0], points[1], points[2], color)
-
 proc drawTriangleFan*(verts : varargs[Vector2], color : Color) = ## CONVEX polygon renderer
     var inpoint : Vector2
     var mutverts : seq[Vector2]
@@ -395,7 +372,9 @@ proc drawTriangleFan*(verts : varargs[Vector2], color : Color) = ## CONVEX polyg
 
 func isCCW*(s : seq[Vector2]) : bool =
     doAssert s.len >= 3
-    return s[0].x*s[1].y - s[0].y*s[1].x + s[1].x*s[2].y - s[1].y*s[2].x + s[0].x*s[2].y - s[0].y*s[2].x < 0
+    var s = s.mapIt(it - s[0])
+    # s[0].x*s[1].y - s[0].y*s[1].x + s[1].x*s[2].y - s[1].y*s[2].x + s[0].x*s[2].y - s[0].y*s[2].x
+    return s[1].x*s[2].y - s[1].y*s[2].x < 0
 
 proc drawPolygon*(verts : seq[Vector2], color : Color, ccw : bool) = ## general polygon renderer, naive ear clipping. CCW = counter clockwise - renderer needs to know if points are ccw or clockwise
     var mutverts = verts
