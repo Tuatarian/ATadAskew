@@ -37,13 +37,19 @@ var
     polysCCW : seq[bool]
     drawnPolys : seq[seq[Vector2]]
     omegas : seq[float]
+    pivots : seq[Vector2]
     typingOmega : bool
     heldOmega : string
+    adjPivot : bool
+    heldPivot : Vector2
     cObj : int
     adjInx = 0
     zoom = 1f
     mpos : Vector2
     mposLast : Vector2
+    playing : bool
+    pPolys : seq[seq[Vector2]]
+    pDrawnPolys : seq[seq[Vector2]]
 
 # lvout = readFile("lvl0.txt")
 
@@ -77,100 +83,134 @@ while not WindowShouldClose():
     if IsMouseButtonDown(MOUSE_BUTTON_MIDDLE):
         offset += (mposLast - mpos)/zoom
 
-    if IsKeyPressed(KEY_UP): cObj = (cObj + 1) mod polys.len
-    if IsKeyPressed KEY_DOWN: cObj = (cObj - 1) mod polys.len
-    if IsKeyPressed KEY_M: mode = (mode + 1) mod 3
-    if IsKeyPressed KEY_P: 
-        polys.add @[]
-        drawnPolys.add @[]
-        omegas.add 0
-        polysCCW.add false
-        cObj = polys.len - 1
+    if not playing:
+        if IsKeyPressed(KEY_UP): cObj = (cObj + 1) mod polys.len
+        if IsKeyPressed KEY_DOWN: cObj = (cObj - 1) mod polys.len
+        if IsKeyPressed KEY_M: mode = (mode + 1) mod 3
+        if IsKeyPressed KEY_N: 
+            polys.add @[]
+            drawnPolys.add @[]
+            omegas.add 0
+            polysCCW.add false
+            pivots.add screenCenter
+            cObj = polys.len - 1
 
-    if mode == 0:
-        # if IsKeyPressed KEY_C:
-        #     if polys[cObj][^1] != polys[cObj][0]:
-        #         polys[cObj].add polys[cObj][0]
-        DrawCircleV(mpos, 4, GREEN)
-        if IsMouseButtonPressed MOUSE_LEFT_BUTTON:
-            polys[cObj].add screen2world(mpos, offset, zoom)
-            if polys[cObj].len >= 3 and isCCW polys[cObj]:
-                polysCCW[cObj] = true
-        if drawnPolys.len > 0 and drawnPolys[cObj].len > 1: #IsKeyPressed(KEY_C):
-            var lines : seq[float]
-            for i in 0..<drawnPolys[cObj].len:
-                lines.add abs(drawnPolys[cObj][i].y + ((drawnPolys[cObj][(i + 1) mod drawnPolys[cObj].len].y - drawnPolys[cObj][i].y)/(drawnPolys[cObj][(i + 1) mod drawnPolys[cObj].len].x - drawnPolys[cObj][i].x))*(mpos.x - drawnPolys[cObj][i].x) - mpos.y)
-            let th = 20
-            if min(lines) <= th:
-                DrawCircleV(mpos, 6, WHITE)
-                DrawCircleV(drawnPolys[cObj][(lines.find(min(lines)) + 1) mod lines.len], 6, WHITE)
-                DrawCircleV(drawnPolys[cObj][lines.find(min(lines))], 6, WHITE)
-                if IsKeyPressed KEY_C:
-                    polys[cObj].insert(screen2world mpos, (lines.find(min(lines)) + 1) mod drawnPolys[cObj].len)
-            # y = p0y + (dy/dx)
-            # if endpts[0].y + (endpts[0].y - endpts[1].y)/(endpts[0].x - endpts[1].x)*(mpos.x - endpts[0].x) - mpos.y <= th:
-            #     polys[cObj].insert(screen2world mpos, drawnPolys[cObj].find(endpts[0]) + 1)
-    elif mode == 1:
-        if (not(IsMouseButtonDown(MOUSE_LEFT_BUTTON))):
-            for i in 0..<polys[cObj].len:
-                if abs(mpos - drawnPolys[cObj][i]) <& makevec2(20, 20):
-                    adjInx = i
-        if adjInx != -1:
-            DrawCircleV(drawnPolys[cObj][adjInx], 6, BLUE)
-            if IsMouseButtonDown(MOUSE_LEFT_BUTTON) and abs(mpos - drawnPolys[cObj][adjInx]) <& max(makevec2(20, 20), abs(mposLast - mpos) + makevec2(4, 4)):
-                polys[cObj][adjInx] = screen2World(mpos, offset, zoom)
+        if mode == 0:
+            # if IsKeyPressed KEY_C:
+            #     if polys[cObj][^1] != polys[cObj][0]:
+            #         polys[cObj].add polys[cObj][0]
+            DrawCircleV(mpos, 4, GREEN)
+            if IsMouseButtonPressed MOUSE_LEFT_BUTTON:
+                polys[cObj].add screen2world(mpos, offset, zoom)
                 if polys[cObj].len >= 3 and isCCW polys[cObj]:
                     polysCCW[cObj] = true
-    elif mode == 2:
-        let distArr = drawnPolys[cObj].mapIt(mag(mpos - it))
-        let mdst = min distArr
-        DrawLineV(drawnPolys[cObj][abs(distArr.find(mdst) - 1) mod distArr.len], drawnPolys[cObj][(distArr.find(mdst) + 1) mod distArr.len], makecolor(WHITED.colHex(), 75))
-        DrawCircleV(drawnPolys[cObj][distArr.find(mdst)], 6, PINK)
-        if mdst <= 20 and IsKeyPressed KEY_DELETE:
-            polys[cObj].delete distArr.find(mdst)
-            if polys[cObj].len >= 3 and isCCW polys[cObj]:
-                polysCCW[cObj] = true
+            if drawnPolys.len > 0 and drawnPolys[cObj].len > 1: #IsKeyPressed(KEY_C):
+                var lines : seq[float]
+                for i in 0..<drawnPolys[cObj].len:
+                    lines.add abs(drawnPolys[cObj][i].y + ((drawnPolys[cObj][(i + 1) mod drawnPolys[cObj].len].y - drawnPolys[cObj][i].y)/(drawnPolys[cObj][(i + 1) mod drawnPolys[cObj].len].x - drawnPolys[cObj][i].x))*(mpos.x - drawnPolys[cObj][i].x) - mpos.y)
+                let th = 20
+                if min(lines) <= th:
+                    DrawCircleV(mpos, 6, WHITE)
+                    DrawCircleV(drawnPolys[cObj][(lines.find(min(lines)) + 1) mod lines.len], 6, WHITE)
+                    DrawCircleV(drawnPolys[cObj][lines.find(min(lines))], 6, WHITE)
+                    if IsKeyPressed KEY_C:
+                        polys[cObj].insert(screen2world mpos, (lines.find(min(lines)) + 1) mod drawnPolys[cObj].len)
+                # y = p0y + (dy/dx)
+                # if endpts[0].y + (endpts[0].y - endpts[1].y)/(endpts[0].x - endpts[1].x)*(mpos.x - endpts[0].x) - mpos.y <= th:
+                #     polys[cObj].insert(screen2world mpos, drawnPolys[cObj].find(endpts[0]) + 1)
+        elif mode == 1:
+            if (not(IsMouseButtonDown(MOUSE_LEFT_BUTTON))):
+                for i in 0..<polys[cObj].len:
+                    if abs(mpos - drawnPolys[cObj][i]) <& makevec2(20, 20):
+                        adjInx = i
+            if adjInx != -1:
+                DrawCircleV(drawnPolys[cObj][adjInx], 6, BLUE)
+                if IsMouseButtonDown(MOUSE_LEFT_BUTTON) and abs(mpos - drawnPolys[cObj][adjInx]) <& max(makevec2(20, 20), abs(mposLast - mpos) + makevec2(4, 4)):
+                    polys[cObj][adjInx] = screen2World(mpos, offset, zoom)
+                    if polys[cObj].len >= 3 and isCCW polys[cObj]:
+                        polysCCW[cObj] = true
+        elif mode == 2:
+            let distArr = drawnPolys[cObj].mapIt(mag(mpos - it))
+            let mdst = min distArr
+            DrawLineV(drawnPolys[cObj][abs(distArr.find(mdst) - 1) mod distArr.len], drawnPolys[cObj][(distArr.find(mdst) + 1) mod distArr.len], makecolor(WHITED.colHex(), 75))
+            DrawCircleV(drawnPolys[cObj][distArr.find(mdst)], 6, PINK)
+            if mdst <= 20 and IsKeyPressed KEY_DELETE:
+                polys[cObj].delete distArr.find(mdst)
+                if polys[cObj].len >= 3 and isCCW polys[cObj]:
+                    polysCCW[cObj] = true
 
-    # Adding omegas and pivots to polys
+        # Adding omegas and pivots to polys
 
-    if typingOmega:
-        # USE DEGREES - I DON"T WANT TO DEAL WITH EXPRS WITH PI
-        if heldOmega.len > 0 and IsKeyPressed KEY_BACKSPACE: heldOmega = heldOmega[0..^2]
-        else:
-            let cPressed = GetCharPressed()
-            if cPressed != 0:
-                heldOmega &= char cPressed
-        if heldOmega != "": omegas[cObj] = parseFloat heldOmega
-    if IsKeyPressed(KEY_O): 
-        typingOmega = not typingOmega
-        if typingOmega == false: 
-            if heldOmega != "":
-                omegas[cObj] = parseFloat heldOmega
-        else:
-            if omegas[cObj] == 0:
-                heldOmega = ""
+        if typingOmega:
+            # USE DEGREES - I DON"T WANT TO DEAL WITH EXPRS WITH PI
+            if heldOmega.len > 0 and IsKeyPressed KEY_BACKSPACE: heldOmega = heldOmega[0..^2]
             else:
-                heldOmega = $omegas[cObj]
+                let cPressed = GetCharPressed()
+                if cPressed != 0 and char(cPressed) != 'o':
+                    heldOmega &= char cPressed
+            if heldOmega != "": omegas[cObj] = parseFloat heldOmega
+        if IsKeyPressed(KEY_O):
+            typingOmega = not typingOmega
+            if typingOmega == false: 
+                if heldOmega != "":
+                    omegas[cObj] = parseFloat heldOmega
+            else:
+                if omegas[cObj] == 0:
+                    heldOmega = ""
+                else:
+                    heldOmega = $omegas[cObj]
 
-    # Draw
+        if adjPivot:
+            if IsKeyPressed(KEY_R):
+                adjPivot = false
+                heldPivot = makevec2(0, 0)
+            else:
+                heldPivot = mpos # screenspace - convert at the end
+        if IsKeyPressed(KEY_P):
+            adjPivot = not adjPivot
+            if adjPivot:
+                heldPivot = world2screen pivots[cObj]
+                SetMousePosition(heldPivot.x.int, heldPivot.y.int)
+            else:
+                pivots[cObj] = heldPivot.screen2world()
+                heldPivot = makevec2(0, 0)
 
-    drawnPolys = polys.mapIt(it.mapIt(it.world2screen(offset, zoom)))
-    for i in 0..<polys.len:
-        rlSetLineWidth 3
-        if polys[i].len > 1:
-            if polys[i].len > 2: 
-                drawPolygon drawnPolys[i], C3, polysCCW[i]
-                if omegas[i] != 0: drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[i + int typingOmega])
-            if i == cObj:
-                drawLines(drawnPolys[cObj], C2)
-                for inx, i in drawnPolys[cObj].pairs:
-                    DrawCircleV(i, 4, colorArr[inx mod colorArr.len])
-            else: 
-                drawLines(drawnPolys[i], WHITEE)
-        rlSetLineWidth 1
+        # Draw
+
+        drawnPolys = polys.mapIt(it.mapIt(it.world2screen(offset, zoom)))
+        for i in 0..<polys.len:
+            rlSetLineWidth 3
+            if polys[i].len > 1:
+                if polys[i].len > 2: 
+                    drawPolygon drawnPolys[i], C3, polysCCW[i]
+                if i == cObj:
+                    if omegas[i] != 0: drawTextCenteredX(heldOmega, int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[i + int typingOmega])
+                    drawLines(drawnPolys[cObj], C2)
+                    for inx, i in drawnPolys[cObj].pairs:
+                        DrawCircleV(i, 4, colorArr[inx mod colorArr.len])
+                else: 
+                    if omegas[i] != 0: drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[i + int typingOmega])
+                    drawLines(drawnPolys[i], WHITEE)
+            rlSetLineWidth 1
+        
+
+        DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
+        DrawRectanglePro(makerect(heldPivot.x - 4, heldPivot.y - 4, 8, 8), makevec2(0, 0), PI/4, C9)
     
-
-    DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
-
+    else:
+        for i in 0..<polys.len:
+            pPolys[i] = pPolys[i].rotateVecSeq(degToRad omegas[i]/60, pivots[i])
+            pDrawnPolys[i] = pPolys[i].mapIt(world2screen it)
+            rlSetLineWidth 3
+            if polys[i].len > 2:
+                discard 
+                drawPolygon pDrawnPolys[i], C3, polysCCW[i]
+            rlSetLineWidth 1
+    
+    if IsKeyPressed(KEY_SPACE):
+        playing = not playing
+        if playing:
+            pPolys = polys
+            pDrawnPolys = drawnPolys
     EndDrawing()
 CloseWindow()
