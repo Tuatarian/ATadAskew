@@ -1,4 +1,4 @@
-import raylib, rayutils, lenientops, sequtils, strutils, rlgl, math, sugar
+import raylib, rayutils, lenientops, sequtils, strutils, rlgl, math, sugar, strformat, zero_functional
 
 template C1*() : Color = makecolor("ECAF1E", 255)
 template C2*() : Color = makecolor("F57F29", 255)
@@ -9,8 +9,8 @@ template C6*() : Color = makecolor("4711AA", 255)
 template C7*() : Color = makecolor("FCF8E6", 255)
 template C8*() : Color = makecolor("EFD8CF", 255)
 template C9*() : Color = makecolor("93CFCF", 255)
-template C9*() : Color = makecolor("624D40", 255)
-template C9*() : Color = makecolor("182534", 255)
+template C10*() : Color = makecolor("624D40", 255)
+template C11*() : Color = makecolor("182534", 255)
 
 const
     screenWidth = 1920
@@ -51,7 +51,38 @@ var
     pPolys : seq[seq[Vector2]]
     pDrawnPolys : seq[seq[Vector2]]
 
-# lvout = readFile("lvl0.txt")
+try:
+    lvout = readFile("lvl0.txt")
+except IOError:
+    discard
+
+proc loadLeveL(lvl : string) =
+    let lvll = lvl.splitLines.filter(x => x != "")
+    for i in 0..<lvll.len:
+        polys.add @[]
+        drawnPolys.add @[]
+        polysCCW.add false
+        omegas.add 0
+        pivots.add screenCenter
+        
+        let terms = toSeq lvll[i].split(',').filterIt(it != "")
+        let coords = terms[0].split(' ').filter(x => x != "").map(x => parseFloat x)
+        echo coords
+        for z in 0..<coords.len div 2:
+            echo z
+            polys[i].add makevec2(coords[2*z], coords[2*z + 1])
+            if z == 2:
+                polysCCW[i] = isCCW polys[i]
+        omegas[i] = terms[1].parseFloat
+        let pv = terms[2].split(" ").filter(x => x != "").toSeq.map(x => parseFloat x)
+        pivots[i] = makevec2(pv[0], pv[1])
+    if polys.len > 0:
+        if omegas[cObj] == 0:
+            heldOmega = ""
+        else:
+            heldOmega = $omegas[cObj]
+
+loadLeveL lvout
 
 #[ MODES
  0 : Adding Mode
@@ -69,10 +100,16 @@ proc screen2world(v : Vector2) : Vector2 = v/zoom + offset
 InitWindow screenWidth, screenHeight, "GAME_NAME"
 SetTargetFPS 60
 
+polys.add @[]
+drawnPolys.add @[]
+omegas.add 0
+polysCCW.add false
+pivots.add screenCenter
+cObj = polys.len - 1
+
 while not WindowShouldClose():
     BeginDrawing()
     ClearBackground C4
-
 
     mposLast = mpos
     mpos = GetMousePosition()
@@ -94,7 +131,13 @@ while not WindowShouldClose():
             polysCCW.add false
             pivots.add screenCenter
             cObj = polys.len - 1
-
+        if IsKeyDown(KEY_BACKSPACE) and IsKeyDown(KEY_LEFT_ALT):
+            polys.delete cObj
+            drawnPolys.delete cObj
+            omegas.delete cObj
+            pivots.delete cObj
+            polysCCW.delete cObj
+            cObj = cObj - 1
         if mode == 0:
             # if IsKeyPressed KEY_C:
             #     if polys[cObj][^1] != polys[cObj][0]:
@@ -177,7 +220,7 @@ while not WindowShouldClose():
 
         # Draw
 
-        drawnPolys = polys.mapIt(it.mapIt(it.world2screen(offset, zoom)))
+        drawnPolys = polys.map(x => x.map(y => world2screen y))
         for i in 0..<polys.len:
             rlSetLineWidth 3
             if polys[i].len > 1:
@@ -195,17 +238,25 @@ while not WindowShouldClose():
         
 
         DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
-        DrawRectanglePro(makerect(heldPivot.x - 4, heldPivot.y - 4, 8, 8), makevec2(0, 0), PI/4, C9)
-    
+        DrawRectanglePro(makerect(heldPivot.x - 4, heldPivot.y - 4, 8, 8), makevec2(0, 0), PI/4, C11)
+
+        # Write Level
+
+        if IsKeyPressed(KEY_ENTER):
+            lvout = ""
+            for i in 0..<polys.len:
+                lvout &= ($polys[i]).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[3..^2] & &",{$omegas[i]}," & ($pivots[i]).replace("x:", "").replace("y:", "").replace("(", "").replace(")", "").replace(",", "")[1..^1] & "\n"
+            writeFile("lvl0.txt", lvout)
+            echo "wrote to lvl0.txt"
     else:
         for i in 0..<polys.len:
             pPolys[i] = pPolys[i].rotateVecSeq(degToRad omegas[i]/60, pivots[i])
             pDrawnPolys[i] = pPolys[i].mapIt(world2screen it)
             rlSetLineWidth 3
             if polys[i].len > 2:
-                discard 
                 drawPolygon pDrawnPolys[i], C3, polysCCW[i]
             rlSetLineWidth 1
+            DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
     
     if IsKeyPressed(KEY_SPACE):
         playing = not playing
