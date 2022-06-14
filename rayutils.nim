@@ -508,3 +508,5 @@ iterator findAll*[T](s : openArray[T], pred : (T) -> bool) : int =
 #     for i in 0..<pts.len:
 #         var bad : seq[Triangle]
 #         # for j in 0..<result.len:
+
+func `sgnmod`*(a : int, range : (int, int)) : int = (((a - range[0]) mod (range[1] - range[0])) + (range[1] - range[0])) mod (range[0] - range[0]) ## wrap number around range
