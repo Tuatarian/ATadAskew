@@ -277,11 +277,11 @@ func `[]=`*[T](container : var seq[seq[T]], x, y : int | float | float32, d : T)
 func `[]=`*[T](container : var seq[seq[T]], v : Vector2, d : T) = ## Vector2 setter for 2d arrays
     container[int v.x][int v.y] = d
 
-func genSeqSeq*[T](y, x : int, val : T) : seq[seq[T]] = ## return a seq[seq[T]] populated with the given value. X and Y are reversed like with matrices
-    for i in 0..<y:
-        result.add @[]
-        for j in 0..<x:
-            result[i].add(val)
+# func genSeqSeq*[T](y, x : int, val : T) : seq[seq[T]] = ## return a seq[seq[T]] populated with the given value. X and Y are reversed like with matrices
+#     for i in 0..<y:
+#         result.add @[]
+#         for j in 0..<x:
+#             result[i].add(val)
 
 func `&=`*[T](s : var string, z : T) = 
     s = s & $z
@@ -434,14 +434,14 @@ func drawTexCenteredFromGrid*(tex : Texture, posx, posy : int, tilesize : int, t
 func drawTexFromGrid*(tex : Texture, posx, posy : int, tilesize : int, tint : Color) =
     DrawTexture(tex, int posx * tilesize, int posy * tilesize, tint)
 
-iterator spsplit*(s : string, key : char | string) : string = ## deprecated, not sure how this differs from strutils split iterator
-    var result : string
-    for c in s:
-        result &= c
-        if key in result:
-            yield result 
-            result = ""
-    yield result
+# iterator spsplit*(s : string, key : char | string) : string = ## deprecated, not sure how this differs from strutils split iterator
+#     var result : string
+#     for c in s:
+#         result &= c
+#         if key in result:
+#             yield result 
+#             result = ""
+#     yield result
 
 func DrawCircle*(centerX : float, centerY : float, radius : float, tint : Color) =
     DrawCircle int centerX, int centerY, radius, tint
