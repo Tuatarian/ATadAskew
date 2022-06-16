@@ -23,12 +23,6 @@ type Player = object
     won : bool
     spawn : Vector2
 
-type Wall = object
-    poly : seq[Vector2]
-    hitbox : seq[Vector2]
-    omega : float
-    pivot : Vector2
-
 var
     offset : Vector2
     mode : int
@@ -67,9 +61,7 @@ proc loadLeveL(lvl : string) =
         
         let terms = toSeq lvll[i].split(',').filterIt(it != "")
         let coords = terms[0].split(' ').filter(x => x != "").map(x => parseFloat x)
-        echo coords
         for z in 0..<coords.len div 2:
-            echo z
             polys[i].add makevec2(coords[2*z], coords[2*z + 1])
             if z == 2:
                 polysCCW[i] = isCCW polys[i]
@@ -95,17 +87,16 @@ proc world2screen(v : Vector2) : Vector2 = (v - offset)*zoom
 func screen2world(v, o : Vector2, z : float) : Vector2 = v/z + o
 proc screen2world(v : Vector2) : Vector2 = v/zoom + offset
 
-
-
 InitWindow screenWidth, screenHeight, "GAME_NAME"
 SetTargetFPS 60
 
-polys.add @[]
-drawnPolys.add @[]
-omegas.add 0
-polysCCW.add false
-pivots.add screenCenter
-cObj = polys.len - 1
+if polys.len == 0:
+    polys.add @[]
+    drawnPolys.add @[]
+    omegas.add 0
+    polysCCW.add false
+    pivots.add screenCenter
+    cObj = polys.len - 1
 
 while not WindowShouldClose():
     BeginDrawing()
@@ -122,7 +113,8 @@ while not WindowShouldClose():
 
     if not playing:
         if IsKeyPressed(KEY_UP): cObj = (cObj + 1) mod polys.len
-        if IsKeyPressed KEY_DOWN: cObj = (cObj - 1) mod polys.len
+        if IsKeyPressed KEY_DOWN: 
+            cObj = (cObj - 1).sgnmod(0, polys.len)
         if IsKeyPressed KEY_M: mode = (mode + 1) mod 3
         if IsKeyPressed KEY_N: 
             polys.add @[]
@@ -131,13 +123,14 @@ while not WindowShouldClose():
             polysCCW.add false
             pivots.add screenCenter
             cObj = polys.len - 1
-        if IsKeyDown(KEY_BACKSPACE) and IsKeyDown(KEY_LEFT_ALT):
+            mode = 0
+        if IsKeyPressed(KEY_BACKSPACE) and IsKeyDown(KEY_LEFT_ALT):
             polys.delete cObj
             drawnPolys.delete cObj
             omegas.delete cObj
             pivots.delete cObj
             polysCCW.delete cObj
-            cObj = cObj - 1
+            cObj = (cObj - 1).sgnmod(0, polys.len)
         if mode == 0:
             # if IsKeyPressed KEY_C:
             #     if polys[cObj][^1] != polys[cObj][0]:
@@ -162,10 +155,12 @@ while not WindowShouldClose():
                 # if endpts[0].y + (endpts[0].y - endpts[1].y)/(endpts[0].x - endpts[1].x)*(mpos.x - endpts[0].x) - mpos.y <= th:
                 #     polys[cObj].insert(screen2world mpos, drawnPolys[cObj].find(endpts[0]) + 1)
         elif mode == 1:
-            if (not(IsMouseButtonDown(MOUSE_LEFT_BUTTON))):
+            if not IsMouseButtonDown MOUSE_LEFT_BUTTON:
+                adjInx = -1
                 for i in 0..<polys[cObj].len:
                     if abs(mpos - drawnPolys[cObj][i]) <& makevec2(20, 20):
                         adjInx = i
+                        break
             if adjInx != -1:
                 DrawCircleV(drawnPolys[cObj][adjInx], 6, BLUE)
                 if IsMouseButtonDown(MOUSE_LEFT_BUTTON) and abs(mpos - drawnPolys[cObj][adjInx]) <& max(makevec2(20, 20), abs(mposLast - mpos) + makevec2(4, 4)):
@@ -185,7 +180,7 @@ while not WindowShouldClose():
         # Adding omegas and pivots to polys
 
         if typingOmega:
-            # USE DEGREES - I DON"T WANT TO DEAL WITH EXPRS WITH PI
+            # USE DEGREES - I DON"T WANT TO DEAL WITH EXPRS IN PI
             if heldOmega.len > 0 and IsKeyPressed KEY_BACKSPACE: heldOmega = heldOmega[0..^2]
             else:
                 let cPressed = GetCharPressed()
@@ -197,6 +192,7 @@ while not WindowShouldClose():
             if typingOmega == false: 
                 if heldOmega != "":
                     omegas[cObj] = parseFloat heldOmega
+                    heldOmega = ""
             else:
                 if omegas[cObj] == 0:
                     heldOmega = ""
@@ -227,12 +223,15 @@ while not WindowShouldClose():
                 if polys[i].len > 2: 
                     drawPolygon drawnPolys[i], C3, polysCCW[i]
                 if i == cObj:
-                    if omegas[i] != 0: drawTextCenteredX(heldOmega, int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[i + int typingOmega])
+                    if heldOmega != "":
+                        if omegas[i] != 0: drawTextCenteredX(heldOmega, int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[1])
+                    elif omegas[i] != 0:
+                        drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[0])                       
                     drawLines(drawnPolys[cObj], C2)
-                    for inx, i in drawnPolys[cObj].pairs:
-                        DrawCircleV(i, 4, colorArr[inx mod colorArr.len])
+                    for inx, v in drawnPolys[cObj].pairs:
+                        DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
                 else: 
-                    if omegas[i] != 0: drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[i + int typingOmega])
+                    if omegas[i] != 0: drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[0])
                     drawLines(drawnPolys[i], WHITEE)
             rlSetLineWidth 1
         
@@ -245,7 +244,7 @@ while not WindowShouldClose():
         if IsKeyPressed(KEY_ENTER):
             lvout = ""
             for i in 0..<polys.len:
-                lvout &= ($polys[i]).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[3..^2] & &",{$omegas[i]}," & ($pivots[i]).replace("x:", "").replace("y:", "").replace("(", "").replace(")", "").replace(",", "")[1..^1] & "\n"
+                lvout &= ($polys[i]).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[3..^2] & &",{$omegas[i]}," & ($pivots[i]).replace("x:", "").replace("y:", "").replace("(", "").replace(")", "").replace(",", "")[1..^1] & "\n" # should have just used regex or some other kind of filtering
             writeFile("lvl0.txt", lvout)
             echo "wrote to lvl0.txt"
     else:
