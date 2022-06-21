@@ -1,6 +1,8 @@
-import raylib, rayutils, lenientops, sequtils, strutils, rlgl, math, sugar, strformat, zero_functional
+import raylib, rayutils, lenientops, sequtils, strutils, rlgl, math, sugar, strformat, zero_functional, random
 
-template C1*() : Color = makecolor("ECAF1E", 255)
+randomize()
+
+template C1*() : Color = makecolor("EE5722", 255)
 template C2*() : Color = makecolor("F57F29", 255)
 template C3*() : Color = makecolor("FABE2B", 255)
 template C4*() : Color = makecolor("46B09D", 255)
@@ -44,11 +46,26 @@ var
     playing : bool
     pPolys : seq[seq[Vector2]]
     pDrawnPolys : seq[seq[Vector2]]
+    lven = makevec2(PI, E)
+    lvenParts : seq[Vector2]
 
 try:
     lvout = readFile("lvl0.txt")
 except IOError:
     discard
+
+proc updateParticles(parts : seq[Vector2], numParts : int, linspeed, rotspeed, rad, killRange : float) : seq[Vector2] =
+    var polarPts = parts.map(x => cart2Polar x)
+    if polarPts.len - numParts < 0:
+        polarPts.add polar2Cart(rand(killRange..rad), rand(2*PI))
+    for i in 0..<polarPts.len:
+        if polarPts[i].x - linspeed/60 <= killRange:
+            polarPts[i] = polar2Cart(rand(killRange..rad), rand(2*PI))
+        else:
+            polarPts[i].y += rotspeed/60
+            polarPts[i].x += -linspeed/60
+    return polarPts.map(x => polar2Cart x)
+    
 
 proc loadLeveL(lvl : string) =
     let lvll = lvl.splitLines.filter(x => x != "")
@@ -140,20 +157,24 @@ while not WindowShouldClose():
                 polys[cObj].add screen2world(mpos, offset, zoom)
                 if polys[cObj].len >= 3 and isCCW polys[cObj]:
                     polysCCW[cObj] = true
+
             if drawnPolys.len > 0 and drawnPolys[cObj].len > 1: #IsKeyPressed(KEY_C):
                 var lines : seq[float]
                 for i in 0..<drawnPolys[cObj].len:
                     lines.add abs(drawnPolys[cObj][i].y + ((drawnPolys[cObj][(i + 1) mod drawnPolys[cObj].len].y - drawnPolys[cObj][i].y)/(drawnPolys[cObj][(i + 1) mod drawnPolys[cObj].len].x - drawnPolys[cObj][i].x))*(mpos.x - drawnPolys[cObj][i].x) - mpos.y)
-                let th = 20
-                if min(lines) <= th:
+                let thck = 20
+                if min(lines) <= thck:
                     DrawCircleV(mpos, 6, WHITE)
                     DrawCircleV(drawnPolys[cObj][(lines.find(min(lines)) + 1) mod lines.len], 6, WHITE)
                     DrawCircleV(drawnPolys[cObj][lines.find(min(lines))], 6, WHITE)
                     if IsKeyPressed KEY_C:
                         polys[cObj].insert(screen2world mpos, (lines.find(min(lines)) + 1) mod drawnPolys[cObj].len)
-                # y = p0y + (dy/dx)
-                # if endpts[0].y + (endpts[0].y - endpts[1].y)/(endpts[0].x - endpts[1].x)*(mpos.x - endpts[0].x) - mpos.y <= th:
-                #     polys[cObj].insert(screen2world mpos, drawnPolys[cObj].find(endpts[0]) + 1)
+
+            if IsKeyPressed KEY_L:
+                lven = screen2world mpos
+            if lven != makevec2(PI, E):
+                lvenParts = updateParticles(lvenParts, numparts = 20, linspeed = 50, rotspeed = 0, rad = 150, killRange = 10)
+
         elif mode == 1:
             if not IsMouseButtonDown MOUSE_LEFT_BUTTON:
                 adjInx = -1
@@ -239,6 +260,11 @@ while not WindowShouldClose():
         DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
         DrawRectanglePro(makerect(heldPivot.x - 4, heldPivot.y - 4, 8, 8), makevec2(0, 0), PI/4, C11)
 
+
+        DrawRectangleV(lven - makevec2(25, 25), makevec2(50, 50), C1)
+        for i in 0..<lvenParts.len:
+            DrawRectangleV(world2screen(lvenParts[i] + lven), makevec2(12*zoom, 15*zoom), C8)
+
         # Write Level
 
         if IsKeyPressed(KEY_ENTER):
@@ -262,5 +288,7 @@ while not WindowShouldClose():
         if playing:
             pPolys = polys
             pDrawnPolys = drawnPolys
+        
+    # Drawing debug space
     EndDrawing()
 CloseWindow()
