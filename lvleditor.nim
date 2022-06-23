@@ -68,23 +68,28 @@ proc updateParticles(parts : seq[Vector2], numParts : int, linspeed, rotspeed, r
     
 
 proc loadLeveL(lvl : string) =
-    let lvll = lvl.splitLines.filter(x => x != "")
+    var lvll = lvl.splitLines.filter(x => x != "")
     for i in 0..<lvll.len:
-        polys.add @[]
-        drawnPolys.add @[]
-        polysCCW.add false
-        omegas.add 0
-        pivots.add screenCenter
-        
-        let terms = toSeq lvll[i].split(',').filterIt(it != "")
-        let coords = terms[0].split(' ').filter(x => x != "").map(x => parseFloat x)
-        for z in 0..<coords.len div 2:
-            polys[i].add makevec2(coords[2*z], coords[2*z + 1])
-            if z == 2:
-                polysCCW[i] = isCCW polys[i]
-        omegas[i] = terms[1].parseFloat
-        let pv = terms[2].split(" ").filter(x => x != "").toSeq.map(x => parseFloat x)
-        pivots[i] = makevec2(pv[0], pv[1])
+        if lvll[i][0] == '&':
+            lvll[i] = lvll[i][1..^1]
+            polys.add @[]
+            drawnPolys.add @[]
+            polysCCW.add false
+            omegas.add 0
+            pivots.add screenCenter
+            
+            let terms = toSeq lvll[i].split(',').filterIt(it != "")
+            let coords = terms[0].split(' ').filter(x => x != "").map(x => parseFloat x)
+            for z in 0..<coords.len div 2:
+                polys[i].add makevec2(coords[2*z], coords[2*z + 1])
+                if z == 2:
+                    polysCCW[i] = isCCW polys[i]
+            omegas[i] = terms[1].parseFloat
+            let pv = terms[2].split(" ").filter(x => x != "").toSeq.map(x => parseFloat x)
+            pivots[i] = makevec2(pv[0], pv[1])
+        elif lvll[i][0] == '/':
+            lvll[i] = lvll[i][1..^1]
+            lven = lvll[i].split(' ').filter(x => x != "").map(x => parseFloat x).makevec2
     if polys.len > 0:
         if omegas[cObj] == 0:
             heldOmega = ""
@@ -117,7 +122,7 @@ if polys.len == 0:
 
 while not WindowShouldClose():
     BeginDrawing()
-    ClearBackground C4
+    ClearBackground C11
 
     mposLast = mpos
     mpos = GetMousePosition()
@@ -242,7 +247,7 @@ while not WindowShouldClose():
             rlSetLineWidth 3
             if polys[i].len > 1:
                 if polys[i].len > 2: 
-                    drawPolygon drawnPolys[i], C3, polysCCW[i]
+                    drawPolygon drawnPolys[i], C9, polysCCW[i]
                 if i == cObj:
                     if heldOmega != "":
                         if omegas[i] != 0: drawTextCenteredX(heldOmega, int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[1])
@@ -253,24 +258,25 @@ while not WindowShouldClose():
                         DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
                 else: 
                     if omegas[i] != 0: drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[0])
-                    drawLines(drawnPolys[i], WHITEE)
+                    # drawLines(drawnPolys[i], WHITEE)
             rlSetLineWidth 1
         
 
         DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
         DrawRectanglePro(makerect(heldPivot.x - 4, heldPivot.y - 4, 8, 8), makevec2(0, 0), PI/4, C11)
 
-
-        DrawRectangleV(lven - makevec2(25, 25), makevec2(50, 50), C1)
-        for i in 0..<lvenParts.len:
-            DrawRectangleV(world2screen(lvenParts[i] + lven), makevec2(12*zoom, 15*zoom), C8)
+        if lven != makevec2(E, PI):
+            DrawRectangleV(world2screen(lven - makevec2(25, 25)), makevec2(50, 50)*zoom, C7)
+            for i in 0..<lvenParts.len:
+                DrawRectangleV(world2screen(lvenParts[i] + lven), zoom*makevec2(12, 15), C7)
 
         # Write Level
 
         if IsKeyPressed(KEY_ENTER):
             lvout = ""
             for i in 0..<polys.len:
-                lvout &= ($polys[i]).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[3..^2] & &",{$omegas[i]}," & ($pivots[i]).replace("x:", "").replace("y:", "").replace("(", "").replace(")", "").replace(",", "")[1..^1] & "\n" # should have just used regex or some other kind of filtering
+                lvout &= "&" & ($polys[i]).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[3..^2] & &",{$omegas[i]}," & ($pivots[i]).replace("x:", "").replace("y:", "").replace("(", "").replace(")", "").replace(",", "")[1..^1] & "\n" # should have just used regex or some other kind of filtering
+            lvout &= "/" & ($lven).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[1..^1] & "\n"
             writeFile("lvl0.txt", lvout)
             echo "wrote to lvl0.txt"
     else:
@@ -279,7 +285,7 @@ while not WindowShouldClose():
             pDrawnPolys[i] = pPolys[i].mapIt(world2screen it)
             rlSetLineWidth 3
             if polys[i].len > 2:
-                drawPolygon pDrawnPolys[i], C3, polysCCW[i]
+                drawPolygon pDrawnPolys[i], C9, polysCCW[i]
             rlSetLineWidth 1
             DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
     
