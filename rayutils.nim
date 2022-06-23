@@ -30,8 +30,12 @@ func colHex*(c : Color) : string =
 
 const colorArr* : array[27, Color] = [LIGHTGRAY, GRAY, DARKGRAY, YELLOW, GOLD, ORANGE, PINK, RED, MAROON, GREEN, LIME, DARKGREEN, SKYBLUE, BLUE, DARKBLUE, PURPLE, VIOLET, DARKPURPLE, BEIGE, BROWN, DARKBROWN, WHITE, BGREY, MAGENTA, RAYWHITE, BGREY, OFFWHITE] ## Array of all rl colours
 
-func makevec2*(x, y: float | float32 | int) : Vector2 =  ## Easy vec2 constructor
+func makevec2*(x, y: float | float32 | int) : Vector2 {.inline.} =  ## Easy vec2 constructor
     Vector2(x : float x, y : float y)
+
+func makevec2*[T](a : openArray[T]) : Vector2 =
+    doAssert a.len == 2
+    return makevec2(a[0], a[1])
 
 func maketri*(v1, v2, v3  : Vector2) : Triangle = Triangle(v1 : v1, v2 : v2, v3 : v3)
 
@@ -186,8 +190,8 @@ proc int2bin*(i : int) : int =
         result = result + rem * tmp
         tmp = tmp * 10
 
-func makerect(v, v2 : Vector2) : Rectangle = 
-    Rectangle(x : v.x, y : v2.y, width : v.x - v2.x, height : v2.y - v.y)
+func makerect*(v, v2 : Vector2) : Rectangle = ## Make sure v2 is below and right of v
+    Rectangle(x : v.x, y : v.y, width : v2.x - v.x, height : v2.y - v.y)
 
 func makerect*(x: int | float | float32, y : int | float | float32, w : int | float | float32, h : int | float | float32) : Rectangle =
     Rectangle(x : float x, y : float y, width : float w, height : float h)
@@ -325,10 +329,15 @@ func reflect*(v : Vector2, tp : int | float) : Vector2 =
 func abs*(v : Vector2) : Vector2 =
     return makevec2(abs v.x, abs v.y)
 
-func cart2Polar*(v : Vector2, c = Vector2(x : 0, y : 0)) : Vector2 = ## Untested, possible edge cases
+func cart2Polar*(v : Vector2, c = Vector2(x : 0, y : 0)) : Vector2 = ## (rho, theta)
     let v = v - c
-    result.x = sqrt((v.x ^ 2) + (v.y ^ 2)) 
+    result.x = sqrt((v.x ^ 2) + (v.y ^ 2))
     result.y = arctan(v.y / v.x)
+    if v.x < 0: result.y += PI
+
+func polar2Cart*(r : int | float | float32, th : float | float32) : Vector2 = return makevec2(r * cos(th), r * sin(th))
+
+func polar2Cart*(v : Vector2) : Vector2 = return makevec2(v.x * cos(v.y), v.x * sin(v.y))
 
 func invert*(v : Vector2) : Vector2 = ## switches x and y
     return makevec2(v.y, v.x)
@@ -338,9 +347,6 @@ func dist*(v, v2 : Vector2) : float = ## distance of 2 vecs (Untested)
 
 func makevec3*(i, j, k : float) : Vector3 = ## Easy vec3 constructor
     return Vector3(x : i, y : j, z : k)
-
-func normalizeToScreen*(v, screenvec : Vector2) : Vector2 = ## Normalize vec2 over screencoord
-    return makevec2(v.x / screenvec.x, v.y / screenvec.y )
 
 proc hash*(v : Vector2) : Hash = ## Hash for vec2
     var h : Hash = 0
@@ -513,3 +519,5 @@ func sgnmod*(a : int, range : (int, int)) : int = (((a - range[0]) mod (range[1]
 
 
 func sgnmod*(a, min, max : int) : int = (((a - min) mod (max - min)) + (max - min)) mod (max - min) ## wrap number a around range (min, max)
+
+# proc randf(a, b : float) : float {.inline.} = rand(b) + a ## less frustrating rand
