@@ -48,6 +48,7 @@ var
     pDrawnPolys : seq[seq[Vector2]]
     lven = makevec2(PI, E)
     lvenParts : seq[Vector2]
+    sPos : Vector2
 
 try:
     lvout = readFile("lvl0.txt")
@@ -70,8 +71,9 @@ proc updateParticles(parts : seq[Vector2], numParts : int, linspeed, rotspeed, r
 proc loadLeveL(lvl : string) =
     var lvll = lvl.splitLines.filter(x => x != "")
     for i in 0..<lvll.len:
-        if lvll[i][0] == '&':
-            lvll[i] = lvll[i][1..^1]
+        let disc = lvll[i][0] 
+        lvll[i] = lvll[i][1..^1]
+        if disc == '&':
             polys.add @[]
             drawnPolys.add @[]
             polysCCW.add false
@@ -87,9 +89,11 @@ proc loadLeveL(lvl : string) =
             omegas[i] = terms[1].parseFloat
             let pv = terms[2].split(" ").filter(x => x != "").toSeq.map(x => parseFloat x)
             pivots[i] = makevec2(pv[0], pv[1])
-        elif lvll[i][0] == '/':
-            lvll[i] = lvll[i][1..^1]
+        elif disc == '/':
             lven = lvll[i].split(' ').filter(x => x != "").map(x => parseFloat x).makevec2
+            echo lven
+        elif disc == 's':
+            sPos = lvll[i].split(' ').filter(x => x != "").map(x => parseFloat x).makevec2
     if polys.len > 0:
         if omegas[cObj] == 0:
             heldOmega = ""
@@ -134,10 +138,13 @@ while not WindowShouldClose():
         offset += (mposLast - mpos)/zoom
 
     if not playing:
+
         if IsKeyPressed(KEY_UP): cObj = (cObj + 1) mod polys.len
         if IsKeyPressed KEY_DOWN: 
             cObj = (cObj - 1).sgnmod(0, polys.len)
+
         if IsKeyPressed KEY_M: mode = (mode + 1) mod 3
+
         if IsKeyPressed KEY_N: 
             polys.add @[]
             drawnPolys.add @[]
@@ -146,6 +153,7 @@ while not WindowShouldClose():
             pivots.add screenCenter
             cObj = polys.len - 1
             mode = 0
+
         if IsKeyPressed(KEY_BACKSPACE) and IsKeyDown(KEY_LEFT_ALT):
             polys.delete cObj
             drawnPolys.delete cObj
@@ -153,6 +161,15 @@ while not WindowShouldClose():
             pivots.delete cObj
             polysCCW.delete cObj
             cObj = (cObj - 1).sgnmod(0, polys.len)
+
+        if IsKeyPressed KEY_L:
+            lven = screen2world mpos
+        if lven != makevec2(PI, E):
+            lvenParts = updateParticles(lvenParts, numparts = 20, linspeed = 50, rotspeed = 0, rad = 150, killRange = 10)
+
+        if IsKeyPressed KEY_S:
+            sPos = screen2world(mpos - makevec2(20, 20)*zoom)
+
         if mode == 0:
             # if IsKeyPressed KEY_C:
             #     if polys[cObj][^1] != polys[cObj][0]:
@@ -174,11 +191,6 @@ while not WindowShouldClose():
                     DrawCircleV(drawnPolys[cObj][lines.find(min(lines))], 6, WHITE)
                     if IsKeyPressed KEY_C:
                         polys[cObj].insert(screen2world mpos, (lines.find(min(lines)) + 1) mod drawnPolys[cObj].len)
-
-            if IsKeyPressed KEY_L:
-                lven = screen2world mpos
-            if lven != makevec2(PI, E):
-                lvenParts = updateParticles(lvenParts, numparts = 20, linspeed = 50, rotspeed = 0, rad = 150, killRange = 10)
 
         elif mode == 1:
             if not IsMouseButtonDown MOUSE_LEFT_BUTTON:
@@ -244,7 +256,6 @@ while not WindowShouldClose():
 
         drawnPolys = polys.map(x => x.map(y => world2screen y))
         for i in 0..<polys.len:
-            rlSetLineWidth 3
             if polys[i].len > 1:
                 if polys[i].len > 2: 
                     drawPolygon drawnPolys[i], C9, polysCCW[i]
@@ -258,9 +269,6 @@ while not WindowShouldClose():
                         DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
                 else: 
                     if omegas[i] != 0: drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[0])
-                    # drawLines(drawnPolys[i], WHITEE)
-            rlSetLineWidth 1
-        
 
         DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
         DrawRectanglePro(makerect(heldPivot.x - 4, heldPivot.y - 4, 8, 8), makevec2(0, 0), PI/4, C11)
@@ -269,6 +277,9 @@ while not WindowShouldClose():
             DrawRectangleV(world2screen(lven - makevec2(25, 25)), makevec2(50, 50)*zoom, C7)
             for i in 0..<lvenParts.len:
                 DrawRectangleV(world2screen(lvenParts[i] + lven), zoom*makevec2(12, 15), C7)
+        
+        if sPos != makevec2(E, PI):
+            DrawRectangleV(world2screen sPos, makevec2(40, 40)*zoom, C1)
 
         # Write Level
 
@@ -277,6 +288,7 @@ while not WindowShouldClose():
             for i in 0..<polys.len:
                 lvout &= "&" & ($polys[i]).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[3..^2] & &",{$omegas[i]}," & ($pivots[i]).replace("x:", "").replace("y:", "").replace("(", "").replace(")", "").replace(",", "")[1..^1] & "\n" # should have just used regex or some other kind of filtering
             lvout &= "/" & ($lven).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[1..^1] & "\n"
+            lvout &= "s" & ($sPos).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[1..^1] & "\n"
             writeFile("lvl0.txt", lvout)
             echo "wrote to lvl0.txt"
     else:
