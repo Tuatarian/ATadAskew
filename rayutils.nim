@@ -55,6 +55,14 @@ func `-`*(v, v2 : Vector2) : Vector2 =
     result.x = v.x - v2.x
     result.y = v.y - v2.y
 
+func `-`*[T](v : Vector2, n : T) : Vector2 =
+    result.x = v.x - n
+    result.y = v.y - n
+
+func `-`*[T](n : T, v : Vector2) : Vector2 =
+    result.x = v.x - n
+    result.y = v.y - n
+
 func `+`*[T](v : Vector2, n : T) : Vector2 =
     result.x = v.x + n
     result.y = v.y + n
@@ -202,20 +210,16 @@ func `in`*(v : Vector2, r : Rectangle) : bool =
 func `notin`*(v : Vector2, r : Rectangle) : bool =
     return not(v in r)
 
-func sign(v, v2, v3 : Vector2) : float =
+func triInUtil(v, v2, v3 : Vector2) : float =
     return (v.x - v3.x) * (v2.y - v3.y) - (v2.x - v3.x) * (v.y - v3.y)
 
 func `in`*(v, t1, t2, t3 : Vector2) : bool =
-    let d = sign(v, t1, t2)
-    let d2 = sign(v, t2, t3)
-    let d3 = sign(v, t3, t1)
+    let d = triInUtil(v, t1, t2)
+    let d2 = triInUtil(v, t2, t3)
+    let d3 = triInUtil(v, t3, t1)
     return not (((d < 0) or (d2 < 0) or (d3 < 0)) and ((d > 0) or (d2 > 0) or (d3 > 0)))
 
-func `in`*(v : Vector2, tri : Triangle) : bool =
-    let d = sign(v, tri.v1, tri.v2)
-    let d2 = sign(v, tri.v2, tri.v3)
-    let d3 = sign(v, tri.v3, tri.v1)
-    return not (((d < 0) or (d2 < 0) or (d3 < 0)) and ((d > 0) or (d2 > 0) or (d3 > 0)))
+func `in`*(v : Vector2, tri : Triangle) : bool = return v.in(tri.v1, tri.v2, tri.v3)
 
 func `notin`*(v : Vector2, t : Triangle) : bool = not(v in t)
 
@@ -236,25 +240,21 @@ proc UnloadSound*(soundargs : varargs[Sound]) = ## runs UnloadSound for each var
 func toTuple*(v : Vector2) : (float32, float32) = ## Returns (x, y)
     return (v.x, v.y) 
 
-func min*(v, v2 : Vector2) : Vector2 = ## Returns min of x and min of y 
+func min*(v, v2 : Vector2) : Vector2 = ## Returns min of x and min of y (componentwise)
     return makevec2(min(v.x, v2.x), min(v.y, v2.y))
 
 func minVargs*[T](args : varargs[T]) : T =
-    var lastmin : T
     for i in args:
-        if i < lastmin:
-            lastmin = i
-    return lastmin 
+        if i < result:
+            result = i 
 
-func max*(v, v2 : Vector2) : Vector2 = ## Returns max of x and max of y
+func max*(v, v2 : Vector2) : Vector2 = ## Returns max of x and max of y (componentwise)
     return makevec2(max(v.x, v2.x), max(v.y, v2.y))
 
 func maxVargs*[T](args : varargs[T]) : T =
-    var lastmax : T
     for i in args:
-        if i > lastmax:
-            lastmax = i
-    return lastmax
+        if i > result:
+            result= i
 
 func mean*[T](items : varargs[T]) : T = sum(items) / items.len
 
@@ -354,35 +354,35 @@ proc hash*(v : Vector2) : Hash = ## Hash for vec2
     h = h !& hash v.y
     result = !$h
 
-proc drawTriangleFan*(verts : varargs[Vector2], color : Color) = ## CONVEX polygon renderer
-    var inpoint : Vector2
-    var mutverts : seq[Vector2]
-
-    for v in verts: 
-        inpoint = inpoint + v
-        mutverts.add(v)
-    
-    inpoint = inpoint / float verts.len
-    mutverts.add(verts[0])
-
-    for i in 1..<mutverts.len:
-        var points = [inpoint, mutverts[i - 1], mutverts[i]]
-        var ininpoint = (points[0] + points[1] + points[2]) / 3
-        var polarpoints = [cart2Polar(points[0], ininpoint), cart2Polar(points[1], ininpoint), cart2Polar(points[2], ininpoint)]
-        for j in 0..points.len:
-            for k in 0..<points.len - 1 - j:
-                if polarpoints[k].y > polarpoints[k + 1].y:
-                    swap(polarpoints[k], polarpoints[k + 1])
-                    swap(points[k], points[k + 1])
-        DrawTriangle(points[0], points[1], points[2], color)
+# proc drawTriangleFan*(verts : varargs[Vector2], color : Color) = ## CONVEX polygon renderer
+#     var inpoint : Vector2
+#     var mutverts : seq[Vector2]
+# 
+#     for v in verts: 
+#         inpoint = inpoint + v
+#         mutverts.add(v)
+#     
+#     inpoint = inpoint / float verts.len
+#     mutverts.add(verts[0])
+# 
+#     for i in 1..<mutverts.len:
+#         var points = [inpoint, mutverts[i - 1], mutverts[i]]
+#         var ininpoint = (points[0] + points[1] + points[2]) / 3
+#         var polarpoints = [cart2Polar(points[0], ininpoint), cart2Polar(points[1], ininpoint), cart2Polar(points[2], ininpoint)]
+#         for j in 0..points.len:
+#             for k in 0..<points.len - 1 - j:
+#                 if polarpoints[k].y > polarpoints[k + 1].y:
+#                     swap(polarpoints[k], polarpoints[k + 1])
+#                     swap(points[k], points[k + 1])
+#         DrawTriangle(points[0], points[1], points[2], color)
 
 func isCCW*(s : seq[Vector2]) : bool =
-    doAssert s.len >= 3
+    assert s.len >= 3
     var s = s.mapIt(it - s[0])
     # s[0].x*s[1].y - s[0].y*s[1].x + s[1].x*s[2].y - s[1].y*s[2].x + s[0].x*s[2].y - s[0].y*s[2].x
     return s[1].x*s[2].y - s[1].y*s[2].x < 0
 
-proc drawPolygon*(verts : seq[Vector2], color : Color, ccw : bool) = ## general polygon renderer, naive ear clipping. CCW = counter clockwise - renderer needs to know if points are ccw or clockwise
+proc drawPolygon*(verts : seq[Vector2], color : Color, ccw : bool) = ## general polygon renderer, naive ear clipping. CCW = counter clockwise - renderer needs to know if points are ccw or cw
     var mutverts = verts
     var tris : seq[Triangle]
     var marked = -1
@@ -465,8 +465,8 @@ func IsKeyDown*[N](k : array[N, KeyboardKey]) : bool =
 proc echo*[T](s : seq[seq[T]]) =
     for i in 0..<s.len:
         for j in 0..<s[i].len:
-            stdout.write s[i, j], " "
-        echo ""
+            stdout.write s[i, j], ' '
+        stdout.write('\n')
 
 func angleToPoint*(v : Vector2) : float = ## Returns in Radians
     result = -arctan(v.y / v.x)
@@ -521,3 +521,38 @@ func sgnmod*(a : int, range : (int, int)) : int = (((a - range[0]) mod (range[1]
 func sgnmod*(a, min, max : int) : int = (((a - min) mod (max - min)) + (max - min)) mod (max - min) ## wrap number a around range (min, max)
 
 # proc randf(a, b : float) : float {.inline.} = rand(b) + a ## less frustrating rand
+
+func slope*(v, v1 : Vector2) : float = return (v.y - v1.y)/(v.x - v1.x) ## calculates slope of line defined by 2 points
+
+func checkColLine*(v, v1, v2, v3 : Vector2) : (bool, Vector2) = ## v and v1 should form a segment, v2 and v3 should form the other segment. not sure what happens if intsec is at endpoint
+    let m1 = slope(v2, v3)
+    let b1 = v2.y - m1*v2.x
+
+    let m = slope(v, v1)
+    let b = v.y - m*v.x
+
+    let colX = (b1 - b)/(m - m1)
+    return (colX in min(v2.x, v3.x)..max(v2.x, v3.x) and colX in min(v.x, v1.x)..max(v.x, v1.x), makevec2(colX, m*colX + b))
+
+func `in`*(v : Vector2, poly : openArray[Vector2]) : bool = ## O(n) I think
+    let outpoint = makevec2(poly.map(x => x.x).max + 10, poly.map(x => x.y).max + 10)
+    if v |> outpoint: return false
+    var hits : int
+    for i in 0..<poly.len:
+        let (p1, p2) = (poly[i], poly[(i + 1) mod poly.len])
+        if checkColLine(v, outpoint, p1, p2)[0]: hits += 1
+    return bool(hits mod 2)
+
+func center*(r : Rectangle) : Vector2 = makevec2(r.x + r.width/2, r.y + r.height/2)
+
+func checkColRec*(r : Rectangle, poly : openArray[Vector2]) : bool =
+    let verts : array[4, Vector2] = [makevec2(r.x, r.y), makevec2(r.x + r.width, r.y), makevec2(r.x + r.width, r.y + r.height), makevec2(r.x, r.y + r.height)]
+    if r.center in poly: return true
+    for i in 0..<4:
+        for j in 0..<poly.len:
+            let (v1, v2) = (poly[i], poly[(i + 1) mod poly.len])
+            let (p1, p2) = (verts[i], verts[(i + 1) mod 4])
+            if checkColLine(p1, p2, v1, v2)[0]: return true
+    return false
+
+func makerect*(c : Vector2, w, h : int | SomeFloat) : Rectangle = return makerect(int(c.x - w/2), int(c.y - h/2), int w, int h) ## Center, width, height
