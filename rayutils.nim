@@ -1,4 +1,4 @@
-import raylib, math, hashes, sugar, macros, strutils, lenientops, algorithm, random, os, sequtils, rlgl
+import raylib, math, hashes, sugar, macros, strutils, lenientops, algorithm, random, os, sequtils
 
 randomize()
 
