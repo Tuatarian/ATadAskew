@@ -23,10 +23,10 @@ type Player = object
     pos : Vector2
     dead : bool
     won : bool
-    spawn : Vector2
     rect : Rectangle
 
 var
+    plr = Player(dead : false)
     worldCenter = screenCenter
     lvnum = 0
     level = readFile(&"lvl{lvnum}.txt").splitLines.filter(x => x != "")
@@ -37,7 +37,6 @@ var
     omegas : seq[float]
     pivots : seq[Vector2]
     polysCCW : seq[bool]
-    plr : Player
     lven : Vector2
     lvenParts : seq[Vector2]
     mpos : Vector2
@@ -99,16 +98,16 @@ let
     iDrawnPolys = drawnPolys
 
 proc updatePlr(p : var Player) =
-    plr.rect = makerect(plr.pos, 40, 40)
+    plr.rect = makerect(plr.pos, 50, 50)
 
 proc resetLevel() =
     plr.pos = sPos
     polys = iPolys
     drawnPolys = iDrawnPolys
     plr.dead = false
-    echo polys
-    echo iPolys
-    echo "hi"
+    deathWaitTimer = 0
+    started = false
+    updatePlr plr
 
 resetLevel()
 
@@ -126,15 +125,17 @@ while not WindowShouldClose():
             started = true
         
         if started:
-            plr.pos += (screen2world(mpos) - plr.pos)*1
+            plr.pos += (screen2world(mpos) - plr.pos) * 0.9
+            updatePlr(plr)
             
             for i in 0..<polys.len:
                 polys[i] = polys[i].rotateVecSeq(degToRad omegas[i]/60, pivots[i])
                 drawnPolys[i] = polys[i].mapIt(world2screen it)
                 if polys[i].len > 2:
                     if plr.rect.checkColRec polys[i]:
+                        echo plr.pos, sPos
                         drawPolygon drawnPolys[i], C10, polysCCW[i]
-                        # plr.dead = true
+                        plr.dead = true
                     else:
                         drawPolygon drawnPolys[i], C9, polysCCW[i]
                     for inx, v in drawnPolys[i].pairs:
@@ -152,18 +153,14 @@ while not WindowShouldClose():
                     for inx, v in drawnPolys[i].pairs:
                         DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
 
-        updateParticles(lvenParts, numparts = 20, linspeed = 50, rotspeed = 0, rad = 150, killRange = 10)
-        DrawRectangleV(world2screen(lven - makevec2(25, 25)), makevec2(50, 50)*zoom, C7)
-        for i in 0..<lvenParts.len:
-            DrawRectangleV(world2screen(lvenParts[i] + lven), zoom*makevec2(15, 15), C7)
-
-        DrawRectangleV(world2screen(plr.pos - plr.rect.width.int div 2), zoom*makevec2(plr.rect.width, plr.rect.height), C2)
-        EndDrawing()
-
     else:
         deathWaitTimer += 1
-        if deathWaitTimer >= 60:
+        if deathWaitTimer >= 30:
             resetLevel()
+        elif deathWaitTimer == 20:
+            resetLevel()
+            plr.dead = true
+            deathWaitTimer = 20
         for i in 0..<polys.len:
             if polys[i].len > 2:
                 if plr.rect.checkColRec polys[i]:
@@ -172,6 +169,15 @@ while not WindowShouldClose():
                     drawPolygon drawnPolys[i], C9, polysCCW[i]
                 for inx, v in drawnPolys[i].pairs:
                     DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
-        
+
+
+    updateParticles(lvenParts, numparts = 20, linspeed = 50, rotspeed = 0, rad = 150, killRange = 10)
+    DrawRectangleV(world2screen(lven - makevec2(25, 25)), makevec2(50, 50)*zoom, C7)
+    for i in 0..<lvenParts.len:
+        DrawRectangleV(world2screen(lvenParts[i] + lven), zoom*makevec2(15, 15), C7)
+
+    DrawRectangleV(world2screen(plr.pos - plr.rect.width.int div 2), zoom*makevec2(plr.rect.width, plr.rect.height), C2)
+    EndDrawing()
+
 
 CloseWindow()
