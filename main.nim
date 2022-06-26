@@ -52,7 +52,7 @@ proc loadLeveL(lvl : int) =
         polysCCW.add false
         omegas.add 0
         pivots.add screenCenter
-        
+            
         let terms = toSeq lvll[i].split(',').filterIt(it != "")
         echo terms
         let coords = terms[0].split(' ').filter(x => x != "").map(x => parseFloat x)

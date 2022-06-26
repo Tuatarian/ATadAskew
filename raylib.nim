@@ -79,7 +79,7 @@ else:                               ".so"
 template RAYLIB_VERSION*(): auto = "4.1-dev"
 # Function specifiers in case library is build/used as a shared library (Windows)
 # NOTE: Microsoft specifiers to tell compiler that symbols are imported/exported from a .dll
-{.pragma: RLAPI, cdecl, discardable, dynlib: "raylib" & LEXT.}
+{.pragma: RLAPI, cdecl, discardable, dynlib: "./raylib" & LEXT.}
 # ----------------------------------------------------------------------------------
 # Some basic Defines
 # ----------------------------------------------------------------------------------
