@@ -136,7 +136,8 @@ func `*`*(v : Vector2, mat : seq[int] | seq[float]) : Vector2 = ## Requires 2x2 
 func getRotMat*(th : int | float | float32) : seq[int] | seq[float] = ## Get Rotation Matrix, Radians, [[a, b],[c,d]] -> [a, b, c, d]
     return @[cos th, -sin th, sin th, cos th]
 
-func det*(mat : seq[int] | float | float32) : int | float | float32 = ## 2x2 matrix required
+func det(mat : openArray[int | SomeFloat]) : int | SomeFloat = ## 2x2 matrix required, column order ie [a, c, b, d]
+    assert mat.len == 4
     mat[0]*mat[3] - mat[2]*mat[1] 
 
 func rotateVec*(v : Vector2, th : int | float | float32) : Vector2 = ## About the origin
@@ -376,11 +377,15 @@ proc hash*(v : Vector2) : Hash = ## Hash for vec2
 #                     swap(points[k], points[k + 1])
 #         DrawTriangle(points[0], points[1], points[2], color)
 
+func makeMat(v, v1 : Vector2) : array[4, float32] = ## s = col1, s1 = col2
+    return [v.x, v.y, v1.x, v1.y]
+
 func isCCW*(s : seq[Vector2]) : bool =
     assert s.len >= 3
-    var s = s.mapIt(it - s[0])
-    # s[0].x*s[1].y - s[0].y*s[1].x + s[1].x*s[2].y - s[1].y*s[2].x + s[0].x*s[2].y - s[0].y*s[2].x
-    return s[1].x*s[2].y - s[1].y*s[2].x < 0
+    var area : float
+    for i in 0..<s.len:
+        area += (-s[i].x + s[(i + 1) mod s.len].x)*(s[i].y + s[(i + 1) mod s.len].y)
+    return area > 0
 
 proc drawPolygon*(verts : seq[Vector2], color : Color, ccw : bool) = ## general polygon renderer, naive ear clipping. CCW = counter clockwise - renderer needs to know if points are ccw or cw
     var mutverts = verts
@@ -408,13 +413,17 @@ proc drawPolygon*(verts : seq[Vector2], color : Color, ccw : bool) = ## general 
             # check if vertex is reflex
 
             let (r0, r2) = (v0 - v1, v2 - v1)
+            let det = r0.x*r2.y - r0.y*r2.x
+            if det == 0: 
+                marked = i
+                break
             if ccw:
-                if r0.x*r2.y > r0.y*r2.x:
+                if det > 0:
                     marked = i
                     tris.add maketri(v0, v1, v2)
                     break
             else:
-                if r0.x*r2.y < r0.y*r2.x:
+                if det < 0:
                     marked = i
                     tris.add maketri(v2, v1, v0)
                     break
