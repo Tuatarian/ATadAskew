@@ -558,9 +558,9 @@ func checkColRec*(r : Rectangle, poly : openArray[Vector2]) : bool =
     let verts : array[4, Vector2] = [makevec2(r.x, r.y), makevec2(r.x + r.width, r.y), makevec2(r.x + r.width, r.y + r.height), makevec2(r.x, r.y + r.height)]
     if r.center in poly: return true
     for i in 0..<4:
+        let (p1, p2) = (verts[i], verts[(i + 1) mod 4])
         for j in 0..<poly.len:
-            let (v1, v2) = (poly[i], poly[(i + 1) mod poly.len])
-            let (p1, p2) = (verts[i], verts[(i + 1) mod 4])
+            let (v1, v2) = (poly[j], poly[(j + 1) mod poly.len])
             if checkColLine(p1, p2, v1, v2)[0]: return true
     return false
 
@@ -569,3 +569,5 @@ func makerect*(c : Vector2, w, h : int | SomeFloat) : Rectangle = return makerec
 func SetMousePosition*(v : Vector2) = SetMousePosition(v.x.int, v.y.int)
 
 template lerp*[T](a, b : T, c : int | SomeFloat) : untyped = a + (b - a)*c ## Moves a towards b linearly by a factory of c
+
+proc parseInt*(c : char) : int = parseInt $c
