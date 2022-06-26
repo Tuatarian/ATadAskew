@@ -94,11 +94,6 @@ proc loadLeveL(lvl : string) =
             echo lven
         elif disc == 's':
             sPos = lvll[i].split(' ').filter(x => x != "").map(x => parseFloat x).makevec2
-    if polys.len > 0:
-        if omegas[cObj] == 0:
-            heldOmega = ""
-        else:
-            heldOmega = $omegas[cObj]
 
 loadLeveL lvout
 
@@ -261,14 +256,14 @@ while not WindowShouldClose():
                     drawPolygon drawnPolys[i], C9, polysCCW[i]
                 if i == cObj:
                     if heldOmega != "":
-                        if omegas[i] != 0: drawTextCenteredX(heldOmega, int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[1])
+                        if omegas[i] != 0: drawTextCenteredX(heldOmega, int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[7])
                     elif omegas[i] != 0:
-                        drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[0])                       
+                        drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[1])                       
                     drawLines(drawnPolys[cObj], C2)
                     for inx, v in drawnPolys[cObj].pairs:
                         DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
                 else: 
-                    if omegas[i] != 0: drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[0])
+                    if omegas[i] != 0: drawTextCenteredX(($omegas[i]).dup removeSuffix ".0", int mean(drawnPolys[i]).x, int mean(drawnPolys[i]).y, int(60 * zoom), colorArr[1])
 
         DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
         DrawRectanglePro(makerect(heldPivot.x - 4, heldPivot.y - 4, 8, 8), makevec2(0, 0), PI/4, C11)
