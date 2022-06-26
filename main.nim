@@ -44,6 +44,8 @@ var
     sPos : Vector2
     started : bool
     deathWaitTimer : int
+    winWaitTimer : int
+    iPolys = polys
 
 InitWindow screenWidth, screenHeight, "GAME_NAME"
 SetTargetFPS 60
@@ -65,7 +67,14 @@ proc updateParticles(parts : var seq[Vector2], numParts : int, linspeed, rotspee
             polarPts[i].x += -linspeed/60
     parts = polarPts.map(x => polar2Cart x)
 
-proc loadLeveL(lvl : seq[string]) =
+proc loadLevel(lvl : seq[string]) =
+    # cleaning
+    polys = @[]
+    drawnPolys = @[]
+    polysCCW = @[]
+    omegas = @[]
+    pivots = @[]
+
     var lvll = lvl
     for i in 0..<lvll.len:
         let disc = lvll[i][0] 
@@ -90,23 +99,21 @@ proc loadLeveL(lvl : seq[string]) =
             lven = lvll[i].split(' ').filter(x => x != "").map(x => parseFloat x).makevec2
         elif disc == 's':
             sPos = lvll[i].split(' ').filter(x => x != "").map(x => parseFloat x).makevec2
-
-loadLeveL(level)
-
-let
     iPolys = polys
-    iDrawnPolys = drawnPolys
+
+loadLevel(level)
 
 proc updatePlr(p : var Player) =
     plr.rect = makerect(plr.pos, 50, 50)
 
 proc resetLevel() =
+    plr = Player()
     plr.pos = sPos
     polys = iPolys
-    drawnPolys = iDrawnPolys
     plr.dead = false
     deathWaitTimer = 0
     started = false
+    winWaitTimer = 0
     updatePlr plr
 
 resetLevel()
@@ -120,20 +127,22 @@ while not WindowShouldClose():
     ClearBackground C11
 
     if not plr.dead:
-
-        if IsMouseButtonPressed MOUSE_LEFT_BUTTON:
-            started = true
-        
         if started:
             plr.pos += (screen2world(mpos) - plr.pos) * 0.9
             updatePlr(plr)
             
+            # Did player hit the lven
+
+            if mag(plr.pos - lven) <= 70:
+                started = false
+                plr.won = true
+
+            # Draw Polygons
             for i in 0..<polys.len:
                 polys[i] = polys[i].rotateVecSeq(degToRad omegas[i]/60, pivots[i])
                 drawnPolys[i] = polys[i].mapIt(world2screen it)
                 if polys[i].len > 2:
                     if plr.rect.checkColRec polys[i]:
-                        echo plr.pos, sPos
                         drawPolygon drawnPolys[i], C10, polysCCW[i]
                         plr.dead = true
                     else:
@@ -142,25 +151,39 @@ while not WindowShouldClose():
                         DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
         
         else:
-          for i in 0..<polys.len:
-                drawnPolys[i] = polys[i].mapIt(world2screen it)
-                if polys[i].len > 2:
-                    if plr.rect.checkColRec polys[i]:
-                        drawPolygon drawnPolys[i], C10, polysCCW[i]
-                        plr.dead = true
-                    else:
-                        drawPolygon drawnPolys[i], C9, polysCCW[i]
+            if not plr.won:
+                for i in 0..<polys.len:
+                    drawnPolys[i] = polys[i].mapIt(world2screen it)
+                    if polys[i].len > 2:
+                        if plr.rect.checkColRec polys[i]:
+                            drawPolygon drawnPolys[i], C10, polysCCW[i]
+                        else:
+                            drawPolygon drawnPolys[i], C9, polysCCW[i]
                     for inx, v in drawnPolys[i].pairs:
                         DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
+                
+                if IsMouseButtonPressed MOUSE_LEFT_BUTTON:
+                    started = true
+                    SetMousePosition(screen2world plr.pos)
+            
+            else:
+                winWaitTimer += 1
+                for i in 0..<polys.len:
+                    if winWaitTimer <= 30: polys[i] = polys[i].rotateVecSeq(degToRad(omegas[i]/(60 + lerp(0, 4080, min(1, winWaitTimer/30)))), pivots[i])
+                    drawnPolys[i] = polys[i].mapIt(world2screen it)
+                    if polys[i].len > 2:
+                        if plr.rect.checkColRec polys[i]:
+                            drawPolygon drawnPolys[i], C10, polysCCW[i]
+                        else:
+                            drawPolygon drawnPolys[i], C9, polysCCW[i]
+                    for inx, v in drawnPolys[i].pairs:
+                        DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
+                
 
     else:
         deathWaitTimer += 1
-        if deathWaitTimer >= 30:
+        if deathWaitTimer >= 15:
             resetLevel()
-        elif deathWaitTimer == 20:
-            resetLevel()
-            plr.dead = true
-            deathWaitTimer = 20
         for i in 0..<polys.len:
             if polys[i].len > 2:
                 if plr.rect.checkColRec polys[i]:
@@ -170,6 +193,12 @@ while not WindowShouldClose():
                 for inx, v in drawnPolys[i].pairs:
                     DrawCircleV(v, 4, colorArr[inx mod colorArr.len])
 
+    # Move to next level
+
+    if winWaitTimer >= 45:
+        # level += 1
+        loadLevel(level)
+        resetLevel()
 
     updateParticles(lvenParts, numparts = 20, linspeed = 50, rotspeed = 0, rad = 150, killRange = 10)
     DrawRectangleV(world2screen(lven - makevec2(25, 25)), makevec2(50, 50)*zoom, C7)
@@ -177,6 +206,7 @@ while not WindowShouldClose():
         DrawRectangleV(world2screen(lvenParts[i] + lven), zoom*makevec2(15, 15), C7)
 
     DrawRectangleV(world2screen(plr.pos - plr.rect.width.int div 2), zoom*makevec2(plr.rect.width, plr.rect.height), C2)
+
     EndDrawing()
 
 
