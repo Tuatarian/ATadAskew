@@ -170,7 +170,7 @@ func `&>`*(v : Vector2, n : float32 | int | float) : bool = ## True if both x an
 func `&>`*(v : Vector2, v2 : Vector2) : bool = ## True if both x and y > x2 and y2
     return v.x > v2.x and v.y > v2.y
 
-func `$$`*[T](t : T) : cstring = cstring t ## cast to cstring
+template `$$`*[T](t : T) : cstring = cstring t ## cast to cstring
 
 func drawTextCentered*(s : string, x, y, fsize : int, colour : Color) =
     let tSizeVec = MeasureTextEx(GetFontDefault(), s, float fsize, max(20 ,fsize) / 20) div 2 # max(20, fsize) is black box to me
@@ -556,3 +556,7 @@ func checkColRec*(r : Rectangle, poly : openArray[Vector2]) : bool =
     return false
 
 func makerect*(c : Vector2, w, h : int | SomeFloat) : Rectangle = return makerect(int(c.x - w/2), int(c.y - h/2), int w, int h) ## Center, width, height
+
+func SetMousePosition*(v : Vector2) = SetMousePosition(v.x.int, v.y.int)
+
+template lerp*[T](a, b : T, c : int | SomeFloat) : untyped = a + (b - a)*c ## Moves a towards b linearly by a factory of c
