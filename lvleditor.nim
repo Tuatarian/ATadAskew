@@ -29,6 +29,7 @@ var
     offset : Vector2
     mode : int
     lvout : string
+    lvn = 1
     polys : seq[seq[Vector2]]
     polysCCW : seq[bool]
     drawnPolys : seq[seq[Vector2]]
@@ -49,9 +50,10 @@ var
     lven = makevec2(PI, E)
     lvenParts : seq[Vector2]
     sPos : Vector2
+    closed : seq[bool]
 
 try:
-    lvout = readFile("lvl0.txt")
+    lvout = readFile(&"lvl{$lvn}.txt")
 except IOError:
     discard
 
@@ -117,6 +119,7 @@ if polys.len == 0:
     omegas.add 0
     polysCCW.add false
     pivots.add screenCenter
+    closed.add false
     cObj = polys.len - 1
 
 while not WindowShouldClose():
@@ -143,6 +146,7 @@ while not WindowShouldClose():
         if IsKeyPressed KEY_N: 
             polys.add @[]
             drawnPolys.add @[]
+            closed.add false
             omegas.add 0
             polysCCW.add false
             pivots.add screenCenter
@@ -164,6 +168,14 @@ while not WindowShouldClose():
 
         if IsKeyPressed KEY_S:
             sPos = screen2world(mpos - makevec2(20, 20)*zoom)
+        
+        if KEY_X.IsKeyPressed and polys[cObj].len > 2:
+            if closed[cObj]:
+                closed[cObj] = false
+            else:
+                closed[cObj] = true
+                polysCCW[cObj] = isCCW polys[cObj]
+
 
         if mode == 0:
             # if IsKeyPressed KEY_C:
@@ -172,8 +184,6 @@ while not WindowShouldClose():
             DrawCircleV(mpos, 4, GREEN)
             if IsMouseButtonPressed MOUSE_LEFT_BUTTON:
                 polys[cObj].add screen2world(mpos, offset, zoom)
-                if polys[cObj].len >= 3 and isCCW polys[cObj]:
-                    polysCCW[cObj] = true
 
             if drawnPolys.len > 0 and drawnPolys[cObj].len > 1: #IsKeyPressed(KEY_C):
                 var lines : seq[float]
@@ -198,8 +208,6 @@ while not WindowShouldClose():
                 DrawCircleV(drawnPolys[cObj][adjInx], 6, BLUE)
                 if IsMouseButtonDown(MOUSE_LEFT_BUTTON) and abs(mpos - drawnPolys[cObj][adjInx]) <& max(makevec2(20, 20), abs(mposLast - mpos) + makevec2(4, 4)):
                     polys[cObj][adjInx] = screen2World(mpos, offset, zoom)
-                    if polys[cObj].len >= 3 and isCCW polys[cObj]:
-                        polysCCW[cObj] = true
         elif mode == 2:
             let distArr = drawnPolys[cObj].mapIt(mag(mpos - it))
             let mdst = min distArr
@@ -209,7 +217,8 @@ while not WindowShouldClose():
                 polys[cObj].delete distArr.find(mdst)
                 if polys[cObj].len >= 3 and isCCW polys[cObj]:
                     polysCCW[cObj] = true
-
+                else:
+                    polysCCW[cObj] = false
         # Adding omegas and pivots to polys
 
         if typingOmega:
@@ -252,7 +261,7 @@ while not WindowShouldClose():
         drawnPolys = polys.map(x => x.map(y => world2screen y))
         for i in 0..<polys.len:
             if polys[i].len > 1:
-                if polys[i].len > 2: 
+                if closed[i]:
                     drawPolygon drawnPolys[i], C9, polysCCW[i]
                 if i == cObj:
                     if heldOmega != "":
@@ -284,14 +293,14 @@ while not WindowShouldClose():
                 lvout &= "&" & ($polys[i]).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[3..^2] & &",{$omegas[i]}," & ($pivots[i]).replace("x:", "").replace("y:", "").replace("(", "").replace(")", "").replace(",", "")[1..^1] & "\n" # should have just used regex or some other kind of filtering
             lvout &= "/" & ($lven).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[1..^1] & "\n"
             lvout &= "s" & ($sPos).replace(",", "").replace("x:", "").replace("y:", "").replace("(", "").replace(")", "")[1..^1] & "\n"
-            writeFile("lvl0.txt", lvout)
-            echo "wrote to lvl0.txt"
+            writeFile(&"lvl{$lvn}.txt", lvout)
+            echo &"wrote to lvl{$lvn}.txt"
     else:
         for i in 0..<polys.len:
             pPolys[i] = pPolys[i].rotateVecSeq(degToRad omegas[i]/60, pivots[i])
             pDrawnPolys[i] = pPolys[i].mapIt(world2screen it)
             rlSetLineWidth 3
-            if polys[i].len > 2:
+            if closed[i] == true:
                 drawPolygon pDrawnPolys[i], C9, polysCCW[i]
             rlSetLineWidth 1
             DrawRectangleLines(int(-offset.x * zoom), int(-offset.y * zoom), int(1920 * zoom), int(1080 * zoom), WHITE)
